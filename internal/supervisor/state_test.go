@@ -7,7 +7,7 @@ import (
 )
 
 func TestStateFileRoundTrip(t *testing.T) {
-	sf := newStateFile(filepath.Join(t.TempDir(), "byob.state.json"))
+	sf := newStateFile(filepath.Join(t.TempDir(), "ringmaster.state.json"))
 
 	// Missing file loads as empty.
 	m, err := sf.Load()

@@ -22,7 +22,7 @@ var idPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 // placeholders in argv.
 func (c *Config) Validate() error {
 	if c.Version == 0 {
-		return fmt.Errorf(`config: missing "version: 1" at the top of byob.yaml — see byob.example.yaml`)
+		return fmt.Errorf(`config: missing "version: 1" at the top of ringmaster.yaml — see ringmaster.example.yaml`)
 	}
 	if c.Version != 1 {
 		return fmt.Errorf("config: unsupported version %d (want 1)", c.Version)

@@ -1,5 +1,5 @@
-# byob.example.yaml — copy to byob.yaml and adjust paths.
-# byob.yaml is personal machine state and is gitignored.
+# ringmaster.example.yaml — copy to ringmaster.yaml and adjust paths.
+# ringmaster.yaml is personal machine state and is gitignored.
 
 version: 1
 
@@ -33,11 +33,11 @@ projects:
                                      # doesn't leave Laravel pointing at :5173
       - id: "queue"
         argv: ["{php}", "artisan", "queue:work", "--queue=high,low,default"]
-        autostart: false             # not started by `byob up`
+        autostart: false             # not started by `ringmaster up`
         restart: "on-failure"        # restarted on non-zero exit (max 5 in a row)
 
 # --- M3 examples ---
-# An externally-managed service byob only observes (status = port probe):
+# An externally-managed service ringmaster only observes (status = port probe):
 #   - id: apache
 #     external: true
 #

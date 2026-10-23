@@ -1,8 +1,8 @@
 package main
 
-// The daemon client: when `byob serve` is running, the other subcommands
+// The daemon client: when `ringmaster serve` is running, the other subcommands
 // talk to it over REST/WebSocket instead of the M1 file-based layer.
-// Discovery works via byob.daemon.json written next to byob.state.json.
+// Discovery works via ringmaster.daemon.json written next to ringmaster.state.json.
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 	"github.com/coder/websocket"
 )
 
-// daemonInfo is the discovery record written by `byob serve`.
+// daemonInfo is the discovery record written by `ringmaster serve`.
 type daemonInfo struct {
 	Addr string `json:"addr"` // host:port the API listens on
 	PID  int    `json:"pid"`
@@ -26,7 +26,7 @@ type daemonInfo struct {
 
 // daemonPath is the discovery file location, next to the state file.
 func (a *app) daemonPath() string {
-	return filepath.Join(filepath.Dir(a.statePath), "byob.daemon.json")
+	return filepath.Join(filepath.Dir(a.statePath), "ringmaster.daemon.json")
 }
 
 func writeDaemonInfo(path string, info daemonInfo) error {
@@ -142,7 +142,7 @@ func (c *daemonClient) psRemote() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("(via byob serve daemon)")
+	fmt.Println("(via ringmaster serve daemon)")
 	fmt.Printf("%-24s %-10s %-8s %-6s\n", "KEY", "STATUS", "PID", "PORT")
 	for _, p := range st.Projects {
 		for _, t := range p.Tasks {

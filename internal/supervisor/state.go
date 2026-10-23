@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// StateEntry records one spawned task in byob.state.json, with enough
+// StateEntry records one spawned task in ringmaster.state.json, with enough
 // identity (image + OS start time) to detect Windows PID recycling before
 // ever killing a recorded PID.
 type StateEntry struct {
@@ -68,11 +68,11 @@ func (s *stateFile) loadLocked() (map[string]StateEntry, error) {
 	}
 	var entries map[string]StateEntry
 	if err := json.Unmarshal(data, &entries); err != nil {
-		// A corrupt state file must not brick every byob command. Preserve it
+		// A corrupt state file must not brick every ringmaster command. Preserve it
 		// for inspection and continue with an empty state: the worst case is
-		// an orphan that `byob down` can no longer identify, which the Job
+		// an orphan that `ringmaster down` can no longer identify, which the Job
 		// Object layer already covers.
-		fmt.Fprintf(os.Stderr, "byob: state file %s is corrupt (%v) — moving it aside and starting fresh\n", s.path, err)
+		fmt.Fprintf(os.Stderr, "ringmaster: state file %s is corrupt (%v) — moving it aside and starting fresh\n", s.path, err)
 		_ = os.Rename(s.path, s.path+".corrupt")
 		return map[string]StateEntry{}, nil
 	}
@@ -107,7 +107,7 @@ func (s *stateFile) mutate(f func(map[string]StateEntry)) error {
 	// Atomic replace via a per-process temp file: concurrent writers (e.g. a
 	// daemon shutting down while its successor starts) can lose the race but
 	// can never interleave bytes into a corrupt file.
-	tmp, err := os.CreateTemp(filepath.Dir(s.path), ".byob.state.*.tmp")
+	tmp, err := os.CreateTemp(filepath.Dir(s.path), ".ringmaster.state.*.tmp")
 	if err != nil {
 		return fmt.Errorf("state: temp file: %w", err)
 	}

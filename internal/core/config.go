@@ -5,11 +5,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aremanzh/byob/internal/config"
+	"github.com/aremanzh/ringmaster/internal/config"
 )
 
 // ProjectSpec is the wire shape for reading, adding or updating a project.
-// Tasks use the same schema as byob.yaml. GetProject returns this shape so the
+// Tasks use the same schema as ringmaster.yaml. GetProject returns this shape so the
 // UI editor can round-trip it unchanged into AddProject/UpdateProject.
 type ProjectSpec struct {
 	ID    string     `json:"id"`
@@ -31,7 +31,7 @@ type TaskSpec struct {
 	Port      int        `json:"port"`
 	Ready     *ReadySpec `json:"ready"`
 	// RequiresDocker must be carried through, or an editor save would silently
-	// drop it from byob.yaml.
+	// drop it from ringmaster.yaml.
 	RequiresDocker bool     `json:"requires_docker"`
 	Cleanup        []string `json:"cleanup,omitempty"`
 }

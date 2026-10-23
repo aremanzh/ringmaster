@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aremanzh/byob/internal/api"
+	"github.com/aremanzh/ringmaster/internal/api"
 )
 
 // serve runs the M2 daemon: starts every project's autostart tasks, then
@@ -29,7 +29,7 @@ func (a *app) serve(rest []string) error {
 		return err
 	}
 
-	// shutdownReq is closed by POST /api/shutdown (`byob down` remote path).
+	// shutdownReq is closed by POST /api/shutdown (`ringmaster down` remote path).
 	shutdownReq := make(chan struct{})
 	var shutdownOnce sync.Once
 	onShutdown := func() { shutdownOnce.Do(func() { close(shutdownReq) }) }
@@ -48,7 +48,7 @@ func (a *app) serve(rest []string) error {
 
 	// Publish the discovery record so the other subcommands find us.
 	if err := writeDaemonInfo(a.daemonPath(), daemonInfo{Addr: *listen, PID: os.Getpid()}); err != nil {
-		fmt.Fprintf(os.Stderr, "byob: write %s: %v\n", a.daemonPath(), err)
+		fmt.Fprintf(os.Stderr, "ringmaster: write %s: %v\n", a.daemonPath(), err)
 	}
 	defer os.Remove(a.daemonPath())
 

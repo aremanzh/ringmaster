@@ -6,8 +6,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/aremanzh/byob/internal/core"
-	"github.com/aremanzh/byob/internal/supervisor"
+	"github.com/aremanzh/ringmaster/internal/core"
+	"github.com/aremanzh/ringmaster/internal/supervisor"
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -40,12 +40,12 @@ func (a *App) shutdown(ctx context.Context) {
 }
 
 // pumpStatus forwards every supervisor status transition to the frontend as a
-// "byob:status" event — the GUI equivalent of the /api/events WebSocket.
+// "ringmaster:status" event — the GUI equivalent of the /api/events WebSocket.
 func (a *App) pumpStatus() {
 	events, cancel := a.eng.SubscribeEvents()
 	defer cancel()
 	for e := range events {
-		wruntime.EventsEmit(a.ctx, "byob:status", e)
+		wruntime.EventsEmit(a.ctx, "ringmaster:status", e)
 	}
 }
 
@@ -88,7 +88,7 @@ func (a *App) PHP() (map[string]any, error) {
 	return map[string]any{"roots": roots, "installs": installs}, nil
 }
 
-// TailLog streams one task's buffered snapshot plus live lines as "byob:log"
+// TailLog streams one task's buffered snapshot plus live lines as "ringmaster:log"
 // events until StopTail or the next TailLog call. It mirrors the per-task log
 // WebSocket: only one tail is active at a time.
 func (a *App) TailLog(project, task string) error {
@@ -104,11 +104,11 @@ func (a *App) TailLog(project, task string) error {
 	a.mu.Unlock()
 
 	for _, e := range snap {
-		wruntime.EventsEmit(a.ctx, "byob:log", map[string]any{"key": key, "entry": e})
+		wruntime.EventsEmit(a.ctx, "ringmaster:log", map[string]any{"key": key, "entry": e})
 	}
 	go func() {
 		for e := range follow {
-			wruntime.EventsEmit(a.ctx, "byob:log", map[string]any{"key": key, "entry": e})
+			wruntime.EventsEmit(a.ctx, "ringmaster:log", map[string]any{"key": key, "entry": e})
 		}
 	}()
 	return nil

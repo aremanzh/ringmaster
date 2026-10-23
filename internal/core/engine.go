@@ -1,7 +1,7 @@
-// Package core is byob's transport-free operations layer. It wraps one
+// Package core is ringmaster's transport-free operations layer. It wraps one
 // Supervisor plus the live config view and exposes every dashboard operation
 // as a method returning (data, *Error) — no HTTP, no Wails. The REST API
-// (internal/api) and the native GUI (cmd/byob-gui) are both thin adapters
+// (internal/api) and the native GUI (cmd/ringmaster-gui) are both thin adapters
 // over an Engine, so their behaviour can never drift.
 package core
 
@@ -11,16 +11,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aremanzh/byob/internal/config"
-	"github.com/aremanzh/byob/internal/supervisor"
+	"github.com/aremanzh/ringmaster/internal/config"
+	"github.com/aremanzh/ringmaster/internal/supervisor"
 )
 
-// Callbacks are the side effects the host (byob serve, or the GUI) wires into
+// Callbacks are the side effects the host (ringmaster serve, or the GUI) wires into
 // the Engine. Any of them may be nil; the Engine guards nil OnStart, and
 // CanEditConfig/CanDiscover report whether the config/PHP operations are wired.
 type Callbacks struct {
 	// OnStart is called after a task starts (used to mirror its logs to file
-	// for the CLI `byob logs`). May be nil.
+	// for the CLI `ringmaster logs`). May be nil.
 	OnStart func(key string)
 	// SaveConfig persists the already-validated config. Nil disables all
 	// config-editing operations.

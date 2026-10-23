@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aremanzh/ringmaster/internal/config"
+	"github.com/aremanzh/ringmaster/internal/supervisor"
 	"github.com/coder/websocket"
-	"github.com/aremanzh/byob/internal/config"
-	"github.com/aremanzh/byob/internal/supervisor"
 )
 
 // TestEventsWSStreamsStatusTransitions starts a real short-lived process and

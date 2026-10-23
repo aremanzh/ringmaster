@@ -26,17 +26,17 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           $ld = "-s -w -X main.version=$env:VERSION"
-          go build -ldflags $ld -o dist/byob.exe ./cmd/byob
-          go build -tags gui,desktop,production -ldflags "$ld -H windowsgui" -o dist/byob-gui.exe ./cmd/byob-gui
-          & dist/byob.exe -version
+          go build -ldflags $ld -o dist/ringmaster.exe ./cmd/ringmaster
+          go build -tags gui,desktop,production -ldflags "$ld -H windowsgui" -o dist/ringmaster-gui.exe ./cmd/ringmaster-gui
+          & dist/ringmaster.exe -version
 
       - name: Package
         shell: pwsh
         env:
           VERSION: ${{ github.ref_name }}
         run: |
-          Copy-Item byob.example.yaml, README.md, LICENSE dist/
-          $zip = "byob_${env:VERSION}_windows_amd64.zip"
+          Copy-Item ringmaster.example.yaml, README.md, LICENSE dist/
+          $zip = "ringmaster_${env:VERSION}_windows_amd64.zip"
           Compress-Archive -Path dist/* -DestinationPath $zip
           $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
           # LF line ending, so `sha256sum -c` works on any platform.
@@ -48,5 +48,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ github.ref_name }}
         run: |
-          $zip = "byob_${env:VERSION}_windows_amd64.zip"
+          $zip = "ringmaster_${env:VERSION}_windows_amd64.zip"
           gh release create $env:VERSION $zip "$zip.sha256" --title $env:VERSION --generate-notes

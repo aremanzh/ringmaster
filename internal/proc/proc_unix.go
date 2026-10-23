@@ -16,7 +16,7 @@ import (
 //
 // Caveat vs. the Windows Job Object: a descendant that double-forks into its
 // own session escapes the group. Dev servers (php -S, artisan, vite, node)
-// do not do this, and the byob.state.json identity-checked reaping remains
+// do not do this, and the ringmaster.state.json identity-checked reaping remains
 // the second line of defence.
 type unixGroup struct {
 	mu     sync.Mutex

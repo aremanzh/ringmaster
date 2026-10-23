@@ -17,9 +17,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aremanzh/byob/internal/config"
-	"github.com/aremanzh/byob/internal/portcheck"
-	"github.com/aremanzh/byob/internal/proc"
+	"github.com/aremanzh/ringmaster/internal/config"
+	"github.com/aremanzh/ringmaster/internal/portcheck"
+	"github.com/aremanzh/ringmaster/internal/proc"
 )
 
 // Status is a task lifecycle state.
@@ -103,7 +103,7 @@ type task struct {
 }
 
 // New creates a Supervisor persisting spawn records to statePath
-// (byob.state.json).
+// (ringmaster.state.json).
 func New(statePath string) *Supervisor {
 	return &Supervisor{tasks: map[string]*task{}, state: newStateFile(statePath), events: newEventHub()}
 }
@@ -212,15 +212,15 @@ func (t *task) pump(stream string, r io.Reader) {
 
 // cleanup deletes the task's cleanup files. A hard kill (Job Object, or
 // CTRL_BREAK, which Node does not treat as SIGINT) skips the child's own exit
-// handlers, so byob removes what they would have.
+// handlers, so ringmaster removes what they would have.
 func (t *task) cleanup() {
 	for _, path := range t.spec.Cleanup {
 		err := os.Remove(path)
 		switch {
 		case err == nil:
-			t.ring.Append("err", "byob: removed "+path)
+			t.ring.Append("err", "ringmaster: removed "+path)
 		case !errors.Is(err, fs.ErrNotExist):
-			t.ring.Append("err", "byob: cleanup: "+err.Error())
+			t.ring.Append("err", "ringmaster: cleanup: "+err.Error())
 		}
 	}
 }
@@ -248,7 +248,7 @@ func (s *Supervisor) waitReady(t *task) {
 		return // stopped or failed while we were probing
 	}
 	if err != nil {
-		t.ring.Append("err", "byob: readiness failed: "+err.Error())
+		t.ring.Append("err", "ringmaster: readiness failed: "+err.Error())
 		t.status = StatusFailed
 		s.mu.Unlock()
 		s.emit(t.spec.Key, StatusFailed, 0, t.spec.Port)
@@ -305,7 +305,7 @@ func (s *Supervisor) monitor(t *task) {
 		t.failures++
 		failures := t.failures
 		t.status = StatusStarting
-		t.ring.Append("err", fmt.Sprintf("byob: exited with code %d; restart %d/%d in %s", exitCode, failures, maxConsecutiveFailures, restartDelay))
+		t.ring.Append("err", fmt.Sprintf("ringmaster: exited with code %d; restart %d/%d in %s", exitCode, failures, maxConsecutiveFailures, restartDelay))
 		s.mu.Unlock()
 		s.emit(t.spec.Key, StatusStarting, 0, t.spec.Port)
 		time.Sleep(restartDelay)
@@ -314,7 +314,7 @@ func (s *Supervisor) monitor(t *task) {
 		return
 	default:
 		t.status = StatusFailed
-		t.ring.Append("err", fmt.Sprintf("byob: exited with code %d", exitCode))
+		t.ring.Append("err", fmt.Sprintf("ringmaster: exited with code %d", exitCode))
 	}
 	status := t.status
 	s.mu.Unlock()
@@ -342,7 +342,7 @@ func (s *Supervisor) respawn(t *task) {
 		s.mu.Lock()
 		nt.status = StatusFailed
 		s.mu.Unlock()
-		nt.ring.Append("err", "byob: restart failed: "+err.Error())
+		nt.ring.Append("err", "ringmaster: restart failed: "+err.Error())
 		s.emit(nt.spec.Key, StatusFailed, 0, nt.spec.Port)
 	}
 }
@@ -439,7 +439,7 @@ func (s *Supervisor) Forget(key string) error {
 	return nil
 }
 
-// ReapOrphans reconciles byob.state.json against reality. For each recorded
+// ReapOrphans reconciles ringmaster.state.json against reality. For each recorded
 // entry not owned by this supervisor instance:
 //   - dead PID → drop the entry ("stale-removed")
 //   - alive PID whose image+start time match the record → kill it ("killed")

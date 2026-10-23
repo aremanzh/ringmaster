@@ -8,7 +8,7 @@ import (
 // HostLAN is the defaults.host value that means "this machine's current LAN
 // IPv4". It is re-resolved every time task specs are built, so a DHCP lease
 // change (e.g. after a router restart) does not leave a stale address in
-// byob.yaml.
+// ringmaster.yaml.
 const HostLAN = "lan"
 
 // BindHost resolves defaults.host to the concrete address interpolated into

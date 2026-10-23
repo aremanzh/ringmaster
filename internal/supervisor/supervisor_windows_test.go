@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aremanzh/byob/internal/config"
+	"github.com/aremanzh/ringmaster/internal/config"
 )
 
 func newTestSupervisor(t *testing.T) *Supervisor {
 	t.Helper()
-	return New(filepath.Join(t.TempDir(), "byob.state.json"))
+	return New(filepath.Join(t.TempDir(), "ringmaster.state.json"))
 }
 
 func waitStatus(t *testing.T, s *Supervisor, key string, want Status, timeout time.Duration) {

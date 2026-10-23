@@ -81,7 +81,7 @@
   }
 
   function wailsEvents(h) {
-    window.runtime.EventsOn("byob:status", ev => h.onStatus(ev));
+    window.runtime.EventsOn("ringmaster:status", ev => h.onStatus(ev));
     if (h.onOpen) h.onOpen(); // bindings are always "connected"
   }
 
@@ -98,7 +98,7 @@
 
   function wailsLogs(project, task, h) {
     const key = project + ":" + task;
-    const off = window.runtime.EventsOn("byob:log", m => {
+    const off = window.runtime.EventsOn("ringmaster:log", m => {
       if (m.key === key) h.onEntry(m.entry);
     });
     app().TailLog(project, task).catch(() => h.onError && h.onError());

@@ -1,14 +1,14 @@
-# Personal machine config — commit byob.example.yaml instead.
-byob.yaml
+# Personal machine config — commit ringmaster.example.yaml instead.
+ringmaster.yaml
 
 # Machine-local runtime state.
-byob.state.json
-.byob/
+ringmaster.state.json
+.ringmaster/
 
 # Build output.
 /dist/
-byob.exe
-byob.exe~
-byob-gui.exe
-byob-gui.exe~
-byob.daemon.json
+ringmaster.exe
+ringmaster.exe~
+ringmaster-gui.exe
+ringmaster-gui.exe~
+ringmaster.daemon.json

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/aremanzh/ringmaster/internal/supervisor"
 	"github.com/coder/websocket"
-	"github.com/aremanzh/byob/internal/supervisor"
 )
 
 // wsWriteTimeout bounds each individual WebSocket write.

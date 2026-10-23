@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aremanzh/byob/internal/config"
-	"github.com/aremanzh/byob/internal/supervisor"
+	"github.com/aremanzh/ringmaster/internal/config"
+	"github.com/aremanzh/ringmaster/internal/supervisor"
 )
 
 // TestRefreshHostRebuildsStaleSpecs: with host "lan", specs built for an old

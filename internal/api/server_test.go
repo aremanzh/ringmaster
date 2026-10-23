@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/aremanzh/byob/internal/config"
-	"github.com/aremanzh/byob/internal/supervisor"
+	"github.com/aremanzh/ringmaster/internal/config"
+	"github.com/aremanzh/ringmaster/internal/supervisor"
 )
 
 func testServer(t *testing.T) *Server {

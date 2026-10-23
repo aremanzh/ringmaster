@@ -1,6 +1,6 @@
 // Package api is the M2 HTTP layer: a JSON REST API, WebSocket streams for
 // status events and live logs, and the embedded web UI. It is served by
-// `byob serve` and binds loopback by default. Every route is a thin adapter
+// `ringmaster serve` and binds loopback by default. Every route is a thin adapter
 // over a core.Engine — the operations logic lives there, shared with the
 // native GUI, so the two front-ends can never drift.
 package api
@@ -9,20 +9,20 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/aremanzh/byob/internal/config"
-	"github.com/aremanzh/byob/internal/core"
-	"github.com/aremanzh/byob/internal/supervisor"
+	"github.com/aremanzh/ringmaster/internal/config"
+	"github.com/aremanzh/ringmaster/internal/core"
+	"github.com/aremanzh/ringmaster/internal/supervisor"
 )
 
-// Hooks are the callbacks the daemon (`byob serve`) wires into the server.
+// Hooks are the callbacks the daemon (`ringmaster serve`) wires into the server.
 type Hooks struct {
 	// OnStart is called after a task is started via the API (used to mirror
-	// its logs to file for the CLI `byob logs` command). May be nil.
+	// its logs to file for the CLI `ringmaster logs` command). May be nil.
 	OnStart func(key string)
 	// OnShutdown is called when POST /api/shutdown is received (used by
-	// `byob down` to stop the whole daemon). Nil disables the route.
+	// `ringmaster down` to stop the whole daemon). Nil disables the route.
 	OnShutdown func()
-	// SaveConfig persists the (already validated) config to byob.yaml.
+	// SaveConfig persists the (already validated) config to ringmaster.yaml.
 	// Nil disables the config-editing routes.
 	SaveConfig func(cfg *config.Config) error
 	// Rebuild re-runs PHP discovery and spec interpolation after a config

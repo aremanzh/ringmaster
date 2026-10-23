@@ -1,12 +1,12 @@
 //go:build gui
 
-// Command byob-gui is the native desktop front-end for byob. It assembles the
-// same core.Engine as `byob serve` (via internal/daemon) and renders the same
+// Command ringmaster-gui is the native desktop front-end for ringmaster. It assembles the
+// same core.Engine as `ringmaster serve` (via internal/daemon) and renders the same
 // embedded web UI inside a WebView2 window through Wails — no HTTP server, no
 // browser required. Build it with the gui tag plus Wails' own desktop,production
 // tags (without them Wails links a stub that just shows an error and exits):
 //
-//	go build -tags gui,desktop,production -ldflags "-H windowsgui" -o byob-gui.exe ./cmd/byob-gui
+//	go build -tags gui,desktop,production -ldflags "-H windowsgui" -o ringmaster-gui.exe ./cmd/ringmaster-gui
 //
 // A WebView2 runtime (bundled with Windows 11) is required at run time.
 package main
@@ -18,9 +18,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/aremanzh/byob/internal/api"
-	"github.com/aremanzh/byob/internal/config"
-	"github.com/aremanzh/byob/internal/daemon"
+	"github.com/aremanzh/ringmaster/internal/api"
+	"github.com/aremanzh/ringmaster/internal/config"
+	"github.com/aremanzh/ringmaster/internal/daemon"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -31,15 +31,15 @@ var version = "dev"
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "byob-gui:", err)
+		fmt.Fprintln(os.Stderr, "ringmaster-gui:", err)
 		showError(err.Error())
 		os.Exit(1)
 	}
 }
 
 func run(args []string) error {
-	fs := flag.NewFlagSet("byob-gui", flag.ContinueOnError)
-	configPath := fs.String("config", "byob.yaml", "path to the byob.yaml registry")
+	fs := flag.NewFlagSet("ringmaster-gui", flag.ContinueOnError)
+	configPath := fs.String("config", "ringmaster.yaml", "path to the ringmaster.yaml registry")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func run(args []string) error {
 	d := &daemon.Daemon{
 		Cfg:       cfg,
 		CfgPath:   *configPath,
-		StatePath: filepath.Join(filepath.Dir(*configPath), "byob.state.json"),
+		StatePath: filepath.Join(filepath.Dir(*configPath), "ringmaster.state.json"),
 	}
 	run, err := d.Start()
 	if err != nil {
@@ -61,7 +61,7 @@ func run(args []string) error {
 
 	app := NewApp(run.Engine)
 	return wails.Run(&options.App{
-		Title:  "byob " + version,
+		Title:  "Ringmaster " + version,
 		Width:  1180,
 		Height: 760,
 		AssetServer: &assetserver.Options{

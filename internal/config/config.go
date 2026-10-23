@@ -1,4 +1,4 @@
-// Package config loads and validates the byob.yaml project registry and
+// Package config loads and validates the ringmaster.yaml project registry and
 // provides placeholder interpolation for task argv strings.
 package config
 
@@ -9,7 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config is the root of a byob.yaml file.
+// Config is the root of a ringmaster.yaml file.
 type Config struct {
 	// Version is the config schema version. Only version 1 is supported.
 	Version int `yaml:"version"`
@@ -44,7 +44,7 @@ type Project struct {
 	// Port is the default port for the primary task. Zero means "allocate from
 	// defaults.port_range".
 	Port int `yaml:"port,omitempty"`
-	// Tasks are the processes byob supervises for this project.
+	// Tasks are the processes ringmaster supervises for this project.
 	Tasks []Task `yaml:"tasks"`
 }
 
@@ -57,7 +57,7 @@ type Task struct {
 	Argv []string `yaml:"argv"`
 	// Primary marks the task whose port is checked before starting.
 	Primary bool `yaml:"primary,omitempty"`
-	// Autostart controls whether `byob up <project>` starts this task.
+	// Autostart controls whether `ringmaster up <project>` starts this task.
 	// Nil means true (start by default).
 	Autostart *bool `yaml:"autostart,omitempty"`
 	// Restart is the restart policy: "" (treated as "no"), "no", or "on-failure".
@@ -65,7 +65,7 @@ type Task struct {
 	// Ready is the optional readiness probe. Nil means the task is considered
 	// running as soon as it is spawned.
 	Ready *Ready `yaml:"ready,omitempty"`
-	// External marks a service byob observes but does not manage (a Windows
+	// External marks a service ringmaster observes but does not manage (a Windows
 	// service, system Apache, a Docker container). No argv is spawned; status
 	// is derived by probing Port (or the project's port when Port is zero).
 	// External tasks cannot be primary and take no restart/ready policy.
@@ -76,14 +76,14 @@ type Task struct {
 	// RequiresDocker makes starting this task fail fast with a clear message
 	// when the Docker engine is not reachable (preflight `docker version`).
 	RequiresDocker bool `yaml:"requires_docker,omitempty"`
-	// Cleanup lists files, relative to the project path, that byob deletes
+	// Cleanup lists files, relative to the project path, that ringmaster deletes
 	// before the task starts and after it exits. For tools that leave a
 	// marker behind when killed instead of exiting cleanly, e.g. Vite's
 	// public/hot, which otherwise points Laravel at a dead dev server.
 	Cleanup []string `yaml:"cleanup,omitempty"`
 }
 
-// AutostartEnabled reports whether the task should start on `byob up`
+// AutostartEnabled reports whether the task should start on `ringmaster up`
 // (defaults to true when unset).
 func (t Task) AutostartEnabled() bool {
 	return t.Autostart == nil || *t.Autostart
@@ -124,7 +124,7 @@ func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("config: %s not found — run: copy byob.example.yaml byob.yaml (then edit paths), or pass -config", path)
+			return nil, fmt.Errorf("config: %s not found — run: copy ringmaster.example.yaml ringmaster.yaml (then edit paths), or pass -config", path)
 		}
 		return nil, fmt.Errorf("config: read %s: %w", path, err)
 	}

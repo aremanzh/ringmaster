@@ -1,4 +1,4 @@
-module github.com/aremanzh/byob
+module github.com/aremanzh/ringmaster
 
 go 1.26.5
 

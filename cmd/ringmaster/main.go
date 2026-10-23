@@ -1,13 +1,13 @@
-// Command byob is a "bring your own binaries" dev process supervisor (M1:
+// Command ringmaster is a "bring your own binaries" dev process supervisor (M1:
 // Windows + PHP/Laravel, CLI only).
 //
-// Architecture note (M1, no daemon): `byob up` runs the supervisor in the
-// FOREGROUND until Ctrl+C. Cross-process commands work via byob.state.json:
-// `byob down` kills the recorded (identity-verified) supervisor PID — its Job
+// Architecture note (M1, no daemon): `ringmaster up` runs the supervisor in the
+// FOREGROUND until Ctrl+C. Cross-process commands work via ringmaster.state.json:
+// `ringmaster down` kills the recorded (identity-verified) supervisor PID — its Job
 // Object handles close on death and the kernel reaps every task tree.
-// `byob ps` verifies recorded PIDs; `byob logs` tails the log files the up
-// process writes. When the `byob serve` daemon is running (discovered via
-// byob.daemon.json), subcommands route over its REST/WS API instead.
+// `ringmaster ps` verifies recorded PIDs; `ringmaster logs` tails the log files the up
+// process writes. When the `ringmaster serve` daemon is running (discovered via
+// ringmaster.daemon.json), subcommands route over its REST/WS API instead.
 package main
 
 import (
@@ -18,8 +18,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/aremanzh/byob/internal/config"
-	"github.com/aremanzh/byob/internal/daemon"
+	"github.com/aremanzh/ringmaster/internal/config"
+	"github.com/aremanzh/ringmaster/internal/daemon"
 )
 
 // version is set at release build time with -ldflags "-X main.version=v1.2.3".
@@ -27,14 +27,14 @@ var version = "dev"
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
-		fmt.Fprintln(os.Stderr, "byob:", err)
+		fmt.Fprintln(os.Stderr, "ringmaster:", err)
 		os.Exit(1)
 	}
 }
 
 func run(args []string) error {
-	fs := flag.NewFlagSet("byob", flag.ContinueOnError)
-	configPath := fs.String("config", "byob.yaml", "path to the byob.yaml registry")
+	fs := flag.NewFlagSet("ringmaster", flag.ContinueOnError)
+	configPath := fs.String("config", "ringmaster.yaml", "path to the ringmaster.yaml registry")
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	fs.Usage = usage
 	if err := fs.Parse(args); err != nil {
@@ -45,7 +45,7 @@ func run(args []string) error {
 	}
 	rest := fs.Args()
 	if *showVersion || (len(rest) > 0 && rest[0] == "version") {
-		fmt.Println("byob", version)
+		fmt.Println("ringmaster", version)
 		return nil
 	}
 	if len(rest) == 0 {
@@ -62,7 +62,7 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
-	app := &app{cfg: cfg, cfgPath: *configPath, statePath: filepath.Join(filepath.Dir(*configPath), "byob.state.json")}
+	app := &app{cfg: cfg, cfgPath: *configPath, statePath: filepath.Join(filepath.Dir(*configPath), "ringmaster.state.json")}
 
 	switch cmd {
 	case "up":
@@ -84,11 +84,11 @@ func run(args []string) error {
 }
 
 func usage() {
-	fmt.Fprint(os.Stderr, `byob — bring-your-own-binaries dev process supervisor
+	fmt.Fprint(os.Stderr, `ringmaster — bring-your-own-binaries dev process supervisor
 
 Usage:
-  byob [-config byob.yaml] <command> [args]
-  byob -version
+  ringmaster [-config ringmaster.yaml] <command> [args]
+  ringmaster -version
 
 Commands:
   up [projectId]              start project tasks and supervise (foreground; Ctrl+C stops)
@@ -143,9 +143,9 @@ func (a *app) targets(rest []string) ([]config.Project, error) {
 	return []config.Project{p}, nil
 }
 
-// logDir is where the up process mirrors ring-buffer logs for `byob logs`.
+// logDir is where the up process mirrors ring-buffer logs for `ringmaster logs`.
 func (a *app) logDir() string {
-	return filepath.Join(filepath.Dir(a.statePath), ".byob", "logs")
+	return filepath.Join(filepath.Dir(a.statePath), ".ringmaster", "logs")
 }
 
 // logPath maps a task key "proj:task" to its log file.

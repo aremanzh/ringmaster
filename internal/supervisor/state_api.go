@@ -6,9 +6,9 @@ import (
 )
 
 // This file exposes the small state-file API the CLI needs to operate
-// cross-process: `byob up` runs the supervisor in the foreground, while
-// `byob down` / `byob ps` from another terminal work purely off
-// byob.state.json plus identity verification.
+// cross-process: `ringmaster up` runs the supervisor in the foreground, while
+// `ringmaster down` / `ringmaster ps` from another terminal work purely off
+// ringmaster.state.json plus identity verification.
 
 // EntryStatus classifies a recorded state entry against the live system.
 type EntryStatus string
@@ -41,7 +41,7 @@ func RemoveStateEntry(path, key string) error {
 }
 
 // SelfEntry builds a StateEntry describing the current process, used by
-// `byob up` to record its own supervisor PID so `byob down` can stop it
+// `ringmaster up` to record its own supervisor PID so `ringmaster down` can stop it
 // (its Job Object handles close on death, killing every task tree).
 func SelfEntry(key string) (StateEntry, error) {
 	image, created, err := processIdentity(os.Getpid())

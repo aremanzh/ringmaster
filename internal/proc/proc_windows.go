@@ -73,7 +73,7 @@ func (g *windowsGroup) Start(cmd *exec.Cmd) error {
 		cmd.SysProcAttr = &syscall.SysProcAttr{}
 	}
 	cmd.SysProcAttr.CreationFlags |= windows.CREATE_SUSPENDED | windows.CREATE_NEW_PROCESS_GROUP
-	// A console-less supervisor (byob-gui.exe, linked -H windowsgui) would
+	// A console-less supervisor (ringmaster-gui.exe, linked -H windowsgui) would
 	// otherwise get a fresh visible console window per console child. Output
 	// is piped to the log buffer anyway, so run them windowless. With a
 	// console (CLI) we keep sharing it so CTRL_BREAK in Signal() still lands.

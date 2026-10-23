@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/aremanzh/byob/internal/core"
+	"github.com/aremanzh/ringmaster/internal/core"
 )
 
 func (s *Server) handleAddProject(w http.ResponseWriter, r *http.Request) {

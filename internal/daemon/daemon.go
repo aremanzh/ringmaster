@@ -1,7 +1,7 @@
-// Package daemon is byob's shared assembly + lifecycle layer. It resolves a
+// Package daemon is ringmaster's shared assembly + lifecycle layer. It resolves a
 // config into ready-to-run task specs, reaps orphans, starts autostart tasks,
 // and hands back a core.Engine wired with the save/rebuild/discover callbacks.
-// Both the CLI daemon (`byob serve`) and the native GUI (cmd/byob-gui) drive
+// Both the CLI daemon (`ringmaster serve`) and the native GUI (cmd/ringmaster-gui) drive
 // their lifecycle through it, so their startup behaviour can never drift.
 package daemon
 
@@ -11,10 +11,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/aremanzh/byob/internal/config"
-	"github.com/aremanzh/byob/internal/discover"
-	"github.com/aremanzh/byob/internal/portcheck"
-	"github.com/aremanzh/byob/internal/supervisor"
+	"github.com/aremanzh/ringmaster/internal/config"
+	"github.com/aremanzh/ringmaster/internal/discover"
+	"github.com/aremanzh/ringmaster/internal/portcheck"
+	"github.com/aremanzh/ringmaster/internal/supervisor"
 )
 
 // Daemon carries the loaded config and derived paths. It is cheap to construct
@@ -25,9 +25,9 @@ type Daemon struct {
 	StatePath string
 }
 
-// LogDir is where a running supervisor mirrors ring-buffer logs for `byob logs`.
+// LogDir is where a running supervisor mirrors ring-buffer logs for `ringmaster logs`.
 func (d *Daemon) LogDir() string {
-	return filepath.Join(filepath.Dir(d.StatePath), ".byob", "logs")
+	return filepath.Join(filepath.Dir(d.StatePath), ".ringmaster", "logs")
 }
 
 // logPath maps a task key "proj:task" to its log file.
@@ -37,7 +37,7 @@ func (d *Daemon) logPath(key string) string {
 
 // SupervisorKey is the state-file key recording a supervisor itself.
 func SupervisorKey(projectID string) string {
-	return "byob:" + projectID
+	return "ringmaster:" + projectID
 }
 
 // SpecEntry pairs a ready-to-run TaskSpec with its autostart flag.
@@ -90,7 +90,7 @@ func (d *Daemon) BuildAllSpecs(p config.Project, installs []discover.Install, ta
 	// Fail early with a clear message: spawning into a missing working
 	// directory surfaces as Windows' cryptic "The directory name is invalid".
 	if fi, err := os.Stat(p.Path); err != nil || !fi.IsDir() {
-		return nil, fmt.Errorf("project %s: path %q does not exist or is not a directory — check `path` in byob.yaml", p.ID, p.Path)
+		return nil, fmt.Errorf("project %s: path %q does not exist or is not a directory — check `path` in ringmaster.yaml", p.ID, p.Path)
 	}
 
 	host := d.Cfg.Defaults.BindHost()
@@ -181,7 +181,7 @@ func projectUsesPHP(p config.Project) bool {
 	return false
 }
 
-// MirrorLogs streams a task's ring buffer into its log file so `byob logs` can
+// MirrorLogs streams a task's ring buffer into its log file so `ringmaster logs` can
 // tail it from another process.
 func (d *Daemon) MirrorLogs(sup *supervisor.Supervisor, key string) {
 	snap, ch, _, err := sup.Logs(key)
@@ -191,7 +191,7 @@ func (d *Daemon) MirrorLogs(sup *supervisor.Supervisor, key string) {
 	go func() {
 		f, err := os.OpenFile(d.logPath(key), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "byob: open log file for %s: %v\n", key, err)
+			fmt.Fprintf(os.Stderr, "ringmaster: open log file for %s: %v\n", key, err)
 			return
 		}
 		defer f.Close()
@@ -227,7 +227,7 @@ func (d *Daemon) ReapProject(projectID string, includeLive bool) error {
 		status := supervisor.CheckEntry(e)
 		switch {
 		case status == supervisor.EntryOurs && !includeLive && key == supKey:
-			return fmt.Errorf("project %s is already running (supervisor pid %d) — use `byob down %s` first", projectID, e.PID, projectID)
+			return fmt.Errorf("project %s is already running (supervisor pid %d) — use `ringmaster down %s` first", projectID, e.PID, projectID)
 		case status == supervisor.EntryOurs && includeLive:
 			killed, err := supervisor.KillVerified(e)
 			if err != nil {

@@ -9,15 +9,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/aremanzh/byob/internal/config"
-	"github.com/aremanzh/byob/internal/supervisor"
+	"github.com/aremanzh/ringmaster/internal/config"
+	"github.com/aremanzh/ringmaster/internal/supervisor"
 )
 
 // configTestServer wires real Save + a stub Rebuild against a temp yaml.
 func configTestServer(t *testing.T) (*httptest.Server, string) {
 	t.Helper()
 	dir := t.TempDir()
-	cfgPath := filepath.Join(dir, "byob.yaml")
+	cfgPath := filepath.Join(dir, "ringmaster.yaml")
 	cfg := &config.Config{Version: 1, Projects: []config.Project{{
 		ID: "demo", Path: dir,
 		Tasks: []config.Task{{ID: "serve", Argv: []string{"x"}}},

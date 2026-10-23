@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aremanzh/byob/internal/config"
-	"github.com/aremanzh/byob/internal/daemon"
-	"github.com/aremanzh/byob/internal/discover"
-	"github.com/aremanzh/byob/internal/supervisor"
+	"github.com/aremanzh/ringmaster/internal/config"
+	"github.com/aremanzh/ringmaster/internal/daemon"
+	"github.com/aremanzh/ringmaster/internal/discover"
+	"github.com/aremanzh/ringmaster/internal/supervisor"
 )
 
 // up starts every autostart task of the target projects and supervises them
@@ -32,7 +32,7 @@ func (a *app) up(rest []string) error {
 			if err := d.post("/api/projects/" + p.ID + "/start"); err != nil {
 				return err
 			}
-			fmt.Printf("started %s (via byob serve daemon)\n", p.ID)
+			fmt.Printf("started %s (via ringmaster serve daemon)\n", p.ID)
 		}
 		return nil
 	}
@@ -90,7 +90,7 @@ func (a *app) up(rest []string) error {
 			fmt.Println("\nstopping...")
 			for _, key := range started {
 				if err := sup.Stop(key); err != nil {
-					fmt.Fprintf(os.Stderr, "byob: stop %s: %v\n", key, err)
+					fmt.Fprintf(os.Stderr, "ringmaster: stop %s: %v\n", key, err)
 				}
 			}
 			for _, p := range projects {
@@ -133,10 +133,10 @@ func (a *app) down(rest []string) error {
 		return err
 	}
 	if d := a.daemon(); d != nil {
-		// Bare `byob down` shuts the whole daemon down; with a project id it
+		// Bare `ringmaster down` shuts the whole daemon down; with a project id it
 		// only stops that project's tasks (the daemon keeps serving).
 		if len(rest) == 0 {
-			fmt.Println("stopping byob serve daemon...")
+			fmt.Println("stopping ringmaster serve daemon...")
 			if err := d.shutdown(); err != nil {
 				return err
 			}
@@ -147,7 +147,7 @@ func (a *app) down(rest []string) error {
 			if err := d.post("/api/projects/" + p.ID + "/stop"); err != nil {
 				return err
 			}
-			fmt.Printf("stopped %s (via byob serve daemon)\n", p.ID)
+			fmt.Printf("stopped %s (via ringmaster serve daemon)\n", p.ID)
 		}
 		return nil
 	}
@@ -177,7 +177,7 @@ func (a *app) restart(rest []string) error {
 		if err := d.post("/api/projects/" + p.ID + "/restart"); err != nil {
 			return err
 		}
-		fmt.Printf("restarted %s (via byob serve daemon)\n", p.ID)
+		fmt.Printf("restarted %s (via ringmaster serve daemon)\n", p.ID)
 		return nil
 	}
 	if err := a.down(rest); err != nil {

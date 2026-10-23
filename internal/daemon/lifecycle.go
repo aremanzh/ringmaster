@@ -5,10 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aremanzh/byob/internal/config"
-	"github.com/aremanzh/byob/internal/core"
-	"github.com/aremanzh/byob/internal/discover"
-	"github.com/aremanzh/byob/internal/supervisor"
+	"github.com/aremanzh/ringmaster/internal/config"
+	"github.com/aremanzh/ringmaster/internal/core"
+	"github.com/aremanzh/ringmaster/internal/discover"
+	"github.com/aremanzh/ringmaster/internal/supervisor"
 )
 
 // Running is a started daemon: its Engine drives every dashboard operation and
@@ -26,7 +26,7 @@ func (r *Running) Supervisor() *supervisor.Supervisor { return r.sup }
 // Stop stops every registered task and clears this daemon's state entries.
 func (r *Running) Stop() { r.d.shutdown(r.sup) }
 
-// Start runs the same preflight + startup as `byob serve`: reap orphans, build
+// Start runs the same preflight + startup as `ringmaster serve`: reap orphans, build
 // specs for every task, start the autostart ones, and return a core.Engine
 // wired with the save/rebuild/discover callbacks. The caller chooses the
 // transport (HTTP for the CLI, Wails bindings for the GUI).
@@ -61,7 +61,7 @@ func (d *Daemon) Start() (*Running, error) {
 	for _, p := range d.Cfg.Projects {
 		all, err := d.BuildAllSpecs(p, installs, taken)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "byob: skipping %v\n", err)
+			fmt.Fprintf(os.Stderr, "ringmaster: skipping %v\n", err)
 			projErrs[p.ID] = err.Error()
 		}
 		self, err := supervisor.SelfEntry(SupervisorKey(p.ID))
@@ -108,7 +108,7 @@ func (d *Daemon) discoverInstalls(roots []string) ([]core.PHPInstall, error) {
 }
 
 // RebuildSpecs re-runs PHP discovery and argv interpolation for every project
-// of cfg (after a config edit) and reconciles the daemon's byob:<project> self
+// of cfg (after a config edit) and reconciles the daemon's ringmaster:<project> self
 // state entries with the new project set. Projects that fail to build are
 // returned as a core.ProjectErrors alongside the specs of the healthy ones.
 func (d *Daemon) RebuildSpecs(cfg *config.Config) (map[string]supervisor.TaskSpec, error) {
@@ -129,8 +129,8 @@ func (d *Daemon) RebuildSpecs(cfg *config.Config) (map[string]supervisor.TaskSpe
 		}
 	}
 
-	// Self-entry reconciliation: every project gets a byob:<id> record so the
-	// file-based `byob down` fallback can still kill this daemon; records of
+	// Self-entry reconciliation: every project gets a ringmaster:<id> record so the
+	// file-based `ringmaster down` fallback can still kill this daemon; records of
 	// deleted projects are dropped.
 	current := map[string]bool{}
 	for _, p := range cfg.Projects {
@@ -142,7 +142,7 @@ func (d *Daemon) RebuildSpecs(cfg *config.Config) (map[string]supervisor.TaskSpe
 	}
 	if entries, err := supervisor.LoadState(d.StatePath); err == nil {
 		for key := range entries {
-			if strings.HasPrefix(key, "byob:") && !current[key] {
+			if strings.HasPrefix(key, "ringmaster:") && !current[key] {
 				_ = supervisor.RemoveStateEntry(d.StatePath, key)
 			}
 		}
@@ -157,7 +157,7 @@ func (d *Daemon) RebuildSpecs(cfg *config.Config) (map[string]supervisor.TaskSpe
 func (d *Daemon) shutdown(sup *supervisor.Supervisor) {
 	for _, info := range sup.List() {
 		if err := sup.Stop(info.Key); err != nil {
-			fmt.Fprintf(os.Stderr, "byob: stop %s: %v\n", info.Key, err)
+			fmt.Fprintf(os.Stderr, "ringmaster: stop %s: %v\n", info.Key, err)
 		}
 	}
 	for _, p := range d.Cfg.Projects {

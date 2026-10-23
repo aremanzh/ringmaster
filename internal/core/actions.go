@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/aremanzh/byob/internal/config"
-	"github.com/aremanzh/byob/internal/supervisor"
+	"github.com/aremanzh/ringmaster/internal/config"
+	"github.com/aremanzh/ringmaster/internal/supervisor"
 )
 
 // TaskAction starts, stops, or restarts one task. Externally-managed tasks are
@@ -30,7 +30,7 @@ func (e *Engine) TaskAction(project, task, action string) error {
 	e.mu.RUnlock()
 
 	if external {
-		return conflict("task %s is externally managed — byob only observes it", key)
+		return conflict("task %s is externally managed — ringmaster only observes it", key)
 	}
 	if projErr != "" && action != "stop" {
 		return conflict("%s", projErr)

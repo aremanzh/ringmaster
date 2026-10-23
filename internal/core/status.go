@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/aremanzh/byob/internal/supervisor"
+	"github.com/aremanzh/ringmaster/internal/supervisor"
 )
 
 // Status merges the static config with the supervisor's live snapshot. Tasks
