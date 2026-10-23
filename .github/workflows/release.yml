@@ -39,7 +39,8 @@ jobs:
           $zip = "byob_${env:VERSION}_windows_amd64.zip"
           Compress-Archive -Path dist/* -DestinationPath $zip
           $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
-          "$hash  $zip" | Out-File -Encoding ascii "$zip.sha256"
+          # LF line ending, so `sha256sum -c` works on any platform.
+          [IO.File]::WriteAllText("$PWD/$zip.sha256", "$hash  $zip`n")
 
       - name: Publish
         shell: pwsh
