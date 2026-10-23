@@ -22,6 +22,9 @@ import (
 	"github.com/aremanzh/byob/internal/daemon"
 )
 
+// version is set at release build time with -ldflags "-X main.version=v1.2.3".
+var version = "dev"
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "byob:", err)
@@ -32,6 +35,7 @@ func main() {
 func run(args []string) error {
 	fs := flag.NewFlagSet("byob", flag.ContinueOnError)
 	configPath := fs.String("config", "byob.yaml", "path to the byob.yaml registry")
+	showVersion := fs.Bool("version", false, "print the version and exit")
 	fs.Usage = usage
 	if err := fs.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -40,6 +44,10 @@ func run(args []string) error {
 		return err
 	}
 	rest := fs.Args()
+	if *showVersion || (len(rest) > 0 && rest[0] == "version") {
+		fmt.Println("byob", version)
+		return nil
+	}
 	if len(rest) == 0 {
 		usage()
 		return fmt.Errorf("missing subcommand")
@@ -80,6 +88,7 @@ func usage() {
 
 Usage:
   byob [-config byob.yaml] <command> [args]
+  byob -version
 
 Commands:
   up [projectId]              start project tasks and supervise (foreground; Ctrl+C stops)

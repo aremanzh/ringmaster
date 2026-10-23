@@ -26,6 +26,9 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 )
 
+// version is set at release build time with -ldflags "-X main.version=v1.2.3".
+var version = "dev"
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "byob-gui:", err)
@@ -58,7 +61,7 @@ func run(args []string) error {
 
 	app := NewApp(run.Engine)
 	return wails.Run(&options.App{
-		Title:  "byob",
+		Title:  "byob " + version,
 		Width:  1180,
 		Height: 760,
 		AssetServer: &assetserver.Options{
