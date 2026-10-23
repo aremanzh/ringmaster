@@ -1,0 +1,14 @@
+# Personal machine config — commit byob.example.yaml instead.
+byob.yaml
+
+# Machine-local runtime state.
+byob.state.json
+.byob/
+
+# Build output.
+/dist/
+byob.exe
+byob.exe~
+byob-gui.exe
+byob-gui.exe~
+byob.daemon.json

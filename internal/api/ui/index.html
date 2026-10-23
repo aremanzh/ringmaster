@@ -1,0 +1,775 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>byob</title>
+<style>
+  :root {
+    --bg: #0a0a0c; --bg-raise: #0f0f13; --bg-panel: #0c0c10;
+    --border: #1c1c22; --border-soft: #16161c;
+    --text: #e6e6ea; --muted: #8b8b96; --faint: #55555f;
+    --accent: #3ddc84; --accent-dim: rgba(61,220,132,.12);
+    --err: #ff5c5c; --err-dim: rgba(255,92,92,.12);
+    --warn: #f2b544; --warn-dim: rgba(242,181,68,.12);
+    --mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+    --radius: 6px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--text); overflow: hidden;
+    font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+    font-size: 13px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+  .app { display: flex; height: 100vh; }
+
+  /* ---------- icon rail ---------- */
+  .rail { width: 56px; flex: none; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 10px 0; gap: 4px; }
+  .rail .logo { width: 30px; height: 30px; border-radius: var(--radius);
+    background: var(--accent-dim); border: 1px solid rgba(61,220,132,.35);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 12px; font-weight: 700;
+    color: var(--accent); margin-bottom: 12px; }
+  .rail button { width: 36px; height: 36px; border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--faint); background: none; border: none; cursor: pointer;
+    position: relative; }
+  .rail button:hover { color: var(--muted); background: var(--bg-raise); }
+  .rail button.active { color: var(--accent); background: var(--accent-dim); }
+  .rail button.active::before { content: ""; position: absolute; left: -10px;
+    top: 9px; bottom: 9px; width: 2px; background: var(--accent);
+    border-radius: 2px; }
+  .rail svg { width: 17px; height: 17px; stroke: currentColor; fill: none;
+    stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .rail .spacer { flex: 1; }
+  #conn { width: 8px; height: 8px; border-radius: 50%; background: var(--faint);
+    margin-bottom: 6px; flex: none; }
+  #conn.live { background: var(--accent);
+    animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(61,220,132,.45); }
+    50% { box-shadow: 0 0 0 5px rgba(61,220,132,0); }
+  }
+
+  /* ---------- projects list panel ---------- */
+  .list { width: 220px; flex: none; background: var(--bg-panel);
+    border-right: 1px solid var(--border); display: flex;
+    flex-direction: column; }
+  .list-head { padding: 14px 14px 10px; display: flex; align-items: center;
+    justify-content: space-between; }
+  .list-head h2 { font-size: 11px; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted); }
+  .list-head .add { width: 20px; height: 20px; border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--muted); font-size: 13px;
+    line-height: 17px; text-align: center; cursor: pointer; background: none; }
+  .list-head .add:hover { color: var(--accent);
+    border-color: rgba(61,220,132,.4); }
+  #projlist { overflow-y: auto; flex: 1; }
+  .proj { margin: 0 6px 2px; padding: 7px 8px; border-radius: var(--radius);
+    cursor: pointer; display: flex; align-items: center; gap: 8px;
+    border: 1px solid transparent; }
+  .proj:hover { background: var(--bg-raise); }
+  .proj.sel { background: var(--bg-raise); border-color: var(--border); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex: none;
+    background: #3c3c46; }
+  .dot.green { background: var(--accent);
+    box-shadow: 0 0 6px rgba(61,220,132,.6); }
+  .dot.amber { background: var(--warn);
+    box-shadow: 0 0 6px rgba(242,181,68,.5); }
+  .dot.red { background: var(--err);
+    box-shadow: 0 0 6px rgba(255,92,92,.45); }
+  .proj .name { font-size: 13px; font-weight: 500; color: var(--muted);
+    min-width: 0; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; }
+  .proj.sel .name { color: var(--text); }
+  .proj .port { margin-left: auto; font-family: var(--mono); font-size: 10px;
+    color: var(--faint); border: 1px solid var(--border-soft);
+    border-radius: 4px; padding: 1px 5px; flex: none; }
+  .proj.sel .port { color: var(--accent);
+    border-color: rgba(61,220,132,.3); }
+  .list-foot { margin-top: auto; padding: 10px 14px;
+    border-top: 1px solid var(--border-soft); font-size: 11px;
+    color: var(--faint); display: flex; gap: 10px; flex: none; }
+  .list-foot .up { color: var(--accent); }
+
+  /* ---------- main ---------- */
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .main-head { height: 46px; flex: none; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px; padding: 0 18px; }
+  .main-head .pname { font-size: 13px; font-weight: 600; }
+  .main-head .sep { color: var(--faint); }
+  .main-head .path { font-family: var(--mono); font-size: 11px;
+    color: var(--muted); min-width: 0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .main-head .right { margin-left: auto; display: flex; align-items: center;
+    gap: 8px; flex: none; }
+  .btn { font-size: 12px; font-weight: 500; border-radius: var(--radius);
+    padding: 4px 10px; cursor: pointer; border: 1px solid var(--border);
+    background: var(--bg-raise); color: var(--muted); font-family: inherit;
+    transition: color .12s ease, border-color .12s ease; }
+  .btn:hover { color: var(--text); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn:disabled { opacity: .35; cursor: default; pointer-events: none; }
+  .btn.primary { background: var(--accent); border-color: var(--accent);
+    color: #062012; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.danger:hover { color: var(--err); border-color: rgba(255,92,92,.4); }
+
+  .body { flex: 1; display: flex; min-height: 0; }
+  .tasks { flex: 1; min-width: 0; padding: 16px 18px; overflow-y: auto; }
+  .section-label { font-size: 11px; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 8px;
+    display: flex; align-items: center; gap: 8px; }
+  .section-label .hint { margin-left: auto; font-weight: 400;
+    text-transform: none; letter-spacing: 0; color: var(--faint);
+    font-size: 11px; }
+
+  .task { display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+    border: 1px solid var(--border-soft); border-radius: var(--radius);
+    margin-bottom: 6px; background: var(--bg-panel);
+    transition: border-color .12s ease; }
+  .task:hover { border-color: var(--border); }
+  .task .tname { font-size: 12.5px; font-weight: 600; width: 62px;
+    flex: none; }
+  .task .cmd { font-family: var(--mono); font-size: 11.5px;
+    color: var(--muted); white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; min-width: 0; }
+  .task .meta { margin-left: auto; display: flex; align-items: center;
+    gap: 12px; flex: none; }
+  .task .pid, .task .tport { font-family: var(--mono); font-size: 11px;
+    color: var(--faint); font-variant-numeric: tabular-nums; }
+  .task .tport { color: var(--accent); }
+  .task.dim .tport { color: var(--faint); }
+  .task.dim .tname, .task.dim .cmd { color: var(--faint); }
+  .status { font-size: 10.5px; font-family: var(--mono); padding: 1px 6px;
+    border-radius: 4px; color: var(--faint); background: #15151a; }
+  .status.running { color: var(--accent); background: var(--accent-dim); }
+  .status.starting, .status.stopping { color: var(--warn);
+    background: var(--warn-dim); }
+  .status.failed { color: var(--err); background: var(--err-dim); }
+  .projerr { margin: 0 0 .8rem; padding: .55rem .8rem; border-radius: var(--radius);
+    color: var(--err); background: var(--err-dim); font-size: 12px;
+    font-family: var(--mono); overflow-wrap: anywhere; }
+  .task .act { height: 22px; border-radius: var(--radius);
+    border: 1px solid var(--border); background: none; color: var(--faint);
+    cursor: pointer; font-size: 10.5px; padding: 0 7px; font-family: inherit; }
+  .task .act:hover { color: var(--text); border-color: var(--muted); }
+  .task .act:focus-visible { outline: 2px solid var(--accent);
+    outline-offset: 1px; }
+  .task .act:disabled { opacity: .3; pointer-events: none; }
+
+  .empty { border: 1px dashed var(--border); border-radius: var(--radius);
+    padding: 2.2rem 1.5rem; text-align: center; color: var(--muted);
+    font-size: 12.5px; margin-top: 8px; }
+  .empty strong { display: block; color: var(--text); font-size: 13.5px;
+    margin-bottom: .3rem; }
+
+  /* ---------- config editor ---------- */
+  .config { width: 340px; flex: none; padding: 16px; overflow-y: auto;
+    background: var(--bg-panel); border-left: 1px solid var(--border); }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 10.5px; font-weight: 600;
+    letter-spacing: .06em; text-transform: uppercase; color: var(--faint);
+    margin-bottom: 4px; }
+  .input { width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: var(--radius); color: var(--text); font-size: 12px;
+    padding: 5px 8px; font-family: inherit; outline: none;
+    transition: border-color .12s ease; }
+  .input.mono { font-family: var(--mono); font-size: 11.5px; }
+  .input:focus { border-color: rgba(61,220,132,.5); }
+  .input::placeholder { color: var(--faint); }
+  select.input { appearance: auto; }
+  .row2 { display: flex; gap: 8px; }
+  .row2 .field { flex: 1; }
+  .taskrow { border: 1px solid var(--border-soft); border-radius: var(--radius);
+    padding: 8px; margin-bottom: 6px; background: var(--bg); }
+  .kv { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
+  .kv:last-child { margin-bottom: 0; }
+  .kv .tr-name { flex: 0 0 80px; }
+  .kv .rm { width: 20px; height: 24px; flex: none; background: none;
+    border: none; color: var(--faint); cursor: pointer; font-size: 12px; }
+  .kv .rm:hover { color: var(--err); }
+  .check { display: flex; align-items: center; gap: 6px; font-size: 11px;
+    color: var(--muted); cursor: pointer; user-select: none; }
+  .check input { accent-color: var(--accent); }
+  .addline { background: none; border: 1px dashed var(--border);
+    border-radius: var(--radius); color: var(--faint); font-size: 11px;
+    padding: 4px 8px; cursor: pointer; width: 100%; text-align: left;
+    font-family: inherit; }
+  .addline:hover { color: var(--accent); border-color: rgba(61,220,132,.4); }
+  .config-foot { display: flex; align-items: center; gap: 8px;
+    margin-top: 14px; padding-top: 12px;
+    border-top: 1px solid var(--border-soft); }
+  .config-foot .note { font-size: 10.5px; color: var(--faint);
+    margin-left: auto; }
+  .config .muted-note { font-size: 11px; color: var(--faint);
+    margin-bottom: 12px; }
+
+  /* ---------- log pane ---------- */
+  .logs { flex: none; height: 0; border-top: 1px solid var(--border);
+    display: flex; flex-direction: column; background: #08080a;
+    transition: height .15s ease; overflow: hidden; }
+  .logs.open { height: 220px; }
+  .logs-head { height: 30px; flex: none; display: flex; align-items: center;
+    gap: 8px; padding: 0 14px; border-bottom: 1px solid var(--border-soft); }
+  .logs-head .title { font-size: 11px; font-weight: 600;
+    letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .logs-head .tab { font-family: var(--mono); font-size: 11px;
+    color: var(--faint); padding: 2px 8px; border-radius: 4px;
+    cursor: pointer; background: none; border: none; }
+  .logs-head .tab.on { color: var(--accent); background: var(--accent-dim); }
+  .logs-head .close { margin-left: auto; }
+  #logbody { flex: 1; overflow-y: auto; padding: 8px 14px;
+    font-family: var(--mono); font-size: 11.5px; line-height: 1.7;
+    white-space: pre-wrap; word-break: break-all; }
+  #logbody .ts { color: #3c3c46; margin-right: 10px; }
+  #logbody .err { color: var(--err); }
+  #logbody .err .ts { color: rgba(255,92,92,.5); }
+
+  .toast { position: fixed; top: 1rem; right: 1rem; z-index: 40;
+    background: var(--bg-raise); border: 1px solid var(--err);
+    color: var(--err); padding: .6rem 1rem; border-radius: var(--radius);
+    font-size: 12px; display: none; max-width: 44ch;
+    box-shadow: 0 4px 16px rgba(0,0,0,.5); }
+  .toast.show { display: block; animation: slideup .2s ease-out; }
+  @keyframes slideup { from { transform: translateY(.5rem); opacity: 0; }
+    to { transform: none; opacity: 1; } }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #1e1e26; border-radius: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  .rowline { display: flex; align-items: center; gap: .6rem;
+    padding: .3rem 0; font-size: 12px; }
+  .rowline .mono { font-family: var(--mono); font-size: 11.5px;
+    color: var(--muted); flex: 1; min-width: 0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .badge { display: inline-block; font-family: var(--mono); font-size: 10.5px;
+    padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border);
+    color: var(--muted); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important;
+      transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="rail" aria-label="primary">
+    <div class="logo">b</div>
+    <button id="nav-projects" class="active" title="Projects" aria-label="Projects" onclick="setView('projects')">
+      <svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    </button>
+    <button id="nav-php" title="PHP binaries" aria-label="PHP binaries" onclick="setView('php')">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><circle cx="7" cy="7.5" r=".5"/><circle cx="7" cy="16.5" r=".5"/></svg>
+    </button>
+    <div class="spacer"></div>
+    <span id="conn" role="status" aria-live="polite" title="connecting…"></span>
+  </nav>
+
+  <aside class="list">
+    <div class="list-head">
+      <h2>Projects</h2>
+      <button class="add" title="Add project" aria-label="Add project" onclick="openAdd()">+</button>
+    </div>
+    <div id="projlist"></div>
+    <div class="list-foot"><span id="pcount">0 projects</span><span class="up" id="pup"></span></div>
+  </aside>
+
+  <div class="main">
+    <header class="main-head" id="mainhead"></header>
+    <div class="body">
+      <section class="tasks" id="taskpane"></section>
+      <aside class="config" id="configpane" aria-label="project configuration"></aside>
+    </div>
+    <section class="logs" id="logpane" role="region" aria-label="task logs">
+      <div class="logs-head">
+        <span class="title">Logs</span>
+        <span id="logtabs"></span>
+        <button class="btn close" onclick="closeLogs()">close</button>
+      </div>
+      <div id="logbody"></div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast" role="alert" aria-live="assertive"></div>
+
+<script src="backend.js"></script>
+<script>
+"use strict";
+let state = { projects: [] };
+let selected = null;          // selected project id
+let view = "projects";        // "projects" | "php"
+let editorMode = "edit";      // "edit" | "add"
+let editorDraft = null;       // working copy of the config being edited
+let logClose = null;          // active log-tail unsubscribe (Backend.openLogs)
+let logTask = null;
+
+const $ = id => document.getElementById(id);
+const esc = s => (s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove("show"), 5000);
+}
+
+async function api(path, opts) {
+  return Backend.request(path, opts);
+}
+
+async function refresh() {
+  try {
+    state = await api("/api/status");
+    if (!selected || !state.projects.some(p => p.id === selected))
+      selected = state.projects[0]?.id || null;
+    render();
+  } catch (e) { toast("status: " + e.message); }
+}
+
+function projDot(p) {
+  if (p.error) return "red";
+  const st = p.tasks.map(t => t.status);
+  if (st.includes("failed")) return "red";
+  if (st.includes("starting") || st.includes("stopping")) return "amber";
+  if (st.includes("running")) return "green";
+  return "";
+}
+
+function projPort(p) {
+  const prim = p.tasks.find(t => t.primary && t.port);
+  return prim ? ":" + prim.port : "";
+}
+
+function render() {
+  renderList();
+  if (view === "php") { renderPHPView(); return; }
+  renderMain();
+}
+
+function renderList() {
+  const root = $("projlist");
+  root.innerHTML = state.projects.map(p => `
+    <div class="proj ${p.id === selected && view === "projects" ? "sel" : ""}"
+         onclick="selectProject('${p.id}')" role="button" tabindex="0"
+         onkeydown="if(event.key==='Enter')selectProject('${p.id}')">
+      <span class="dot ${projDot(p)}"></span>
+      <span class="name" title="${esc(p.error || p.label || p.id)}">${esc(p.label || p.id)}</span>
+      <span class="port">${projPort(p)}</span>
+    </div>`).join("");
+  const running = state.projects.filter(p => projDot(p) === "green").length;
+  $("pcount").textContent = `${state.projects.length} project${state.projects.length === 1 ? "" : "s"}`;
+  $("pup").textContent = running ? `${running} running` : "";
+}
+
+function selectProject(id) {
+  selected = id;
+  if (view !== "projects") setView("projects", true);
+  if (editorMode === "add") editorMode = "edit";
+  editorDraft = null;
+  closeLogs();
+  render();
+  loadEditor();
+}
+
+function setView(v, skipRender) {
+  view = v;
+  $("nav-projects").classList.toggle("active", v === "projects");
+  $("nav-php").classList.toggle("active", v === "php");
+  if (!skipRender) render();
+  if (v === "projects") loadEditor();
+}
+
+function current() { return state.projects.find(p => p.id === selected); }
+
+function renderMain() {
+  const p = current();
+  const head = $("mainhead");
+  const tasks = $("taskpane");
+  if (!p) {
+    head.innerHTML = `<span class="pname">byob</span><span class="sep">·</span>
+      <span class="path">bring your own binaries</span>`;
+    tasks.innerHTML = `<div class="empty"><strong>No projects yet</strong>
+      Click + in the sidebar to add your first project.</div>`;
+    if (editorMode !== "add") $("configpane").innerHTML = "";
+    return;
+  }
+  head.innerHTML = `
+    <span class="pname">${esc(p.label || p.id)}</span>
+    <span class="sep">·</span>
+    <span class="path" title="${esc(p.path)}">${esc(p.path)}</span>
+    <span class="right">
+      <button class="btn" onclick="projAct('${p.id}','start')">start all</button>
+      <button class="btn" onclick="projAct('${p.id}','stop')">stop all</button>
+      <button class="btn" onclick="projAct('${p.id}','restart')">restart all</button>
+      <button class="btn danger" onclick="removeProject('${p.id}')">remove</button>
+    </span>`;
+  const busy = t => ["starting", "running", "stopping"].includes(t.status);
+  tasks.innerHTML = (p.error ? `
+    <div class="projerr" role="alert">${esc(p.error)}<br>
+      Fix it in the config below — this project's tasks can't start until then.</div>` : "") + `
+    <div class="section-label">Tasks
+      <span class="hint">esc closes logs</span></div>` +
+    p.tasks.map(t => t.external ? `
+    <div class="task dim">
+      <span class="dot ${t.status === "running" ? "green" : ""}"></span>
+      <span class="tname">${esc(t.id)}</span>
+      <span class="cmd">external — observed only, managed outside byob</span>
+      <span class="meta">
+        <span class="tport">${t.port ? ":" + t.port : ""}</span>
+        <span class="status ${t.status}">${t.status === "running" ? "up" : "down"}</span>
+      </span>
+    </div>` : `
+    <div class="task ${busy(t) ? "" : "dim"}">
+      <span class="dot ${t.status === "running" ? "green" : t.status === "failed" ? "red" : ["starting","stopping"].includes(t.status) ? "amber" : ""}"></span>
+      <span class="tname">${esc(t.id)}${t.primary ? " ★" : ""}</span>
+      <span class="cmd" title="${esc((t.argv || []).join(" "))}">${esc((t.argv || []).join(" "))}</span>
+      <span class="meta">
+        <span class="pid">${t.pid ? "PID " + t.pid : ""}</span>
+        <span class="tport">${t.primary && t.port ? ":" + t.port : ""}</span>
+        <span class="status ${t.status}">${t.status}</span>
+        <button class="act" onclick="taskAct('${p.id}','${t.id}','start')" ${busy(t) ? "disabled" : ""} aria-label="start ${esc(t.id)}">▶</button>
+        <button class="act" onclick="taskAct('${p.id}','${t.id}','stop')" ${!busy(t) ? "disabled" : ""} aria-label="stop ${esc(t.id)}">■</button>
+        <button class="act" onclick="taskAct('${p.id}','${t.id}','restart')" aria-label="restart ${esc(t.id)}">⟳</button>
+        <button class="act" onclick="openLogs('${p.id}','${t.id}')" aria-label="logs for ${esc(t.id)}">logs</button>
+      </span>
+    </div>`).join("");
+}
+
+/* ---------- config editor (replaces editing byob.yaml by hand) ---------- */
+
+async function loadEditor() {
+  if (view !== "projects" || editorMode === "add") return;
+  const pane = $("configpane");
+  if (!selected) { pane.innerHTML = ""; return; }
+  try {
+    editorDraft = await api("/api/config/projects/" + selected);
+    editorDraft.tasks = editorDraft.tasks || [];
+    renderEditor();
+  } catch {
+    pane.innerHTML = `<div class="section-label">Configuration</div>
+      <div class="muted-note">Config editing is not available on this daemon.</div>`;
+  }
+}
+
+function renderEditor() {
+  const d = editorDraft;
+  const pane = $("configpane");
+  if (!d) { pane.innerHTML = ""; return; }
+  const adding = editorMode === "add";
+  pane.innerHTML = `
+    <div class="section-label">${adding ? "New project" : "Configuration"}
+      <span class="hint">byob.yaml</span></div>
+    ${adding ? `
+    <div class="field"><label>id</label>
+      <input class="input mono" id="ed-id" value="${esc(d.id)}" placeholder="myapp" pattern="[a-z0-9][a-z0-9_-]*"></div>` : ""}
+    <div class="field"><label>Label</label>
+      <input class="input" id="ed-label" value="${esc(d.label || "")}" placeholder="${esc(d.id)}"></div>
+    <div class="field"><label>Path</label>
+      <input class="input mono" id="ed-path" value="${esc(d.path || "")}" placeholder="C:\\laragon\\www\\myapp"></div>
+    <div class="row2">
+      <div class="field"><label>PHP version</label>
+        <input class="input mono" id="ed-php" value="${esc(d.php || "")}" placeholder="8.2"></div>
+      <div class="field"><label>Base port</label>
+        <input class="input mono" id="ed-port" type="number" min="0" max="65535" value="${d.port || ""}" placeholder="auto"></div>
+    </div>
+    ${adding ? `
+    <div class="field"><label>Template</label>
+      <select class="input" id="ed-preset" onchange="applyPreset(this.value)">
+        <option value="laravel">Laravel (serve + vite + queue)</option>
+        <option value="laravel-serve">Laravel (serve only)</option>
+        <option value="custom">Custom command…</option>
+      </select></div>` : ""}
+    <div class="field"><label>Tasks</label>
+      <div id="ed-tasks">${d.tasks.map((t, i) => taskRowHTML(t, i)).join("")}</div>
+      <button class="addline" onclick="edAddTask()">+ Add task</button>
+    </div>
+    <div class="config-foot">
+      <button class="btn primary" onclick="saveEditor()">${adding ? "Add project" : "Save"}</button>
+      <button class="btn" onclick="${adding ? "cancelAdd()" : "loadEditor()"}">${adding ? "Cancel" : "Revert"}</button>
+      ${adding ? "" : `<span class="note">restart tasks to apply</span>`}
+    </div>`;
+  if (adding) $("ed-id")?.focus();
+}
+
+function taskRowHTML(t, i) {
+  return `
+  <div class="taskrow" data-i="${i}">
+    <div class="kv">
+      <input class="input mono tr-name" value="${esc(t.id || "")}" placeholder="serve"
+        onchange="edTask(${i},'id',this.value)" aria-label="task name">
+      <input class="input mono" value="${esc(argvToText(t.argv))}"
+        placeholder="{php} artisan serve --host={host} --port={port}"
+        onchange="edTask(${i},'argv',this.value)" aria-label="task command">
+      <button class="rm" title="Remove task" onclick="edRmTask(${i})">×</button>
+    </div>
+    <div class="kv">
+      <label class="check"><input type="checkbox" ${t.primary ? "checked" : ""}
+        onchange="edTask(${i},'primary',this.checked)"> primary</label>
+      <label class="check"><input type="checkbox" ${t.autostart === false ? "" : "checked"}
+        onchange="edTask(${i},'autostart',this.checked)"> autostart</label>
+      <label class="check"><input type="checkbox" ${t.external ? "checked" : ""}
+        onchange="edTask(${i},'external',this.checked)"> external</label>
+      <select class="input" style="width:auto; margin-left:auto" aria-label="restart policy"
+        onchange="edTask(${i},'restart',this.value)">
+        <option value="" ${!t.restart ? "selected" : ""}>no restart</option>
+        <option value="on-failure" ${t.restart === "on-failure" ? "selected" : ""}>on-failure</option>
+      </select>
+    </div>
+  </div>`;
+}
+
+// argv <-> one editable line. Args containing whitespace are wrapped in double
+// quotes so paths like "C:\Program Files\..." survive a round-trip.
+function argvToText(argv) {
+  return (argv || []).map(a => /\s/.test(a) || a === "" ? `"${a}"` : a).join(" ");
+}
+
+function textToArgv(s) {
+  return [...s.matchAll(/"([^"]*)"|(\S+)/g)].map(m => m[1] ?? m[2]);
+}
+
+function edTask(i, field, value) {
+  const t = editorDraft.tasks[i];
+  if (!t) return;
+  if (field === "argv") t.argv = textToArgv(value);
+  else if (field === "autostart") t.autostart = value ? null : false;
+  else t[field] = value;
+}
+
+function edAddTask() {
+  editorDraft.tasks.push({ id: "", argv: [] });
+  renderEditor();
+}
+
+function edRmTask(i) {
+  editorDraft.tasks.splice(i, 1);
+  renderEditor();
+}
+
+function applyPreset(preset) {
+  editorDraft.tasks = presetTasks(preset, "");
+  renderEditor();
+}
+
+function presetTasks(preset, command) {
+  const serve = { id: "serve", primary: true,
+    argv: ["{php}", "artisan", "serve", "--host={host}", "--port={port}"],
+    ready: { type: "port" } };
+  if (preset === "laravel")
+    return [serve,
+      { id: "vite", argv: ["npm.cmd", "run", "dev", "--", "--host={host}"],
+        ready: { type: "stdout", match: "ready in" }, cleanup: ["public/hot"] },
+      { id: "queue", autostart: false, restart: "on-failure",
+        argv: ["{php}", "artisan", "queue:work"] }];
+  if (preset === "laravel-serve") return [serve];
+  const argv = (command || "").trim().split(/\s+/).filter(Boolean);
+  return [{ id: "run", primary: true, argv }];
+}
+
+function collectEditor() {
+  const d = editorDraft;
+  d.label = $("ed-label").value.trim();
+  d.path = $("ed-path").value.trim();
+  d.php = $("ed-php").value.trim();
+  d.port = $("ed-port").value ? Number($("ed-port").value) : 0;
+  if (editorMode === "add") d.id = $("ed-id").value.trim();
+  // normalize autostart: null → omit (defaults true)
+  d.tasks.forEach(t => { if (t.autostart === null) delete t.autostart; });
+  return d;
+}
+
+async function saveEditor() {
+  const d = collectEditor();
+  if (editorMode === "add" && !d.id) { toast("project id is required"); return; }
+  if (!d.path) { toast("path is required"); return; }
+  if (!d.tasks.length || d.tasks.some(t => !t.id)) {
+    toast("every task needs a name"); return;
+  }
+  const body = JSON.stringify({
+    id: d.id, label: d.label, path: d.path, php: d.php, port: d.port,
+    tasks: d.tasks,
+  });
+  try {
+    if (editorMode === "add") {
+      await api("/api/config/projects", { method: "POST",
+        headers: { "Content-Type": "application/json" }, body });
+      selected = d.id;
+      editorMode = "edit";
+    } else {
+      await api("/api/config/projects/" + d.id, { method: "PUT",
+        headers: { "Content-Type": "application/json" }, body });
+      toast("saved — restart tasks to apply");
+    }
+    await refresh();
+    loadEditor();
+  } catch (e) { toast("save: " + e.message); }
+}
+
+function openAdd() {
+  editorMode = "add";
+  editorDraft = { id: "", label: "", path: "", php: "", port: 0,
+    tasks: presetTasks("laravel", "") };
+  if (view !== "projects") setView("projects", true);
+  render();
+  renderEditor();
+}
+
+function cancelAdd() {
+  editorMode = "edit";
+  editorDraft = null;
+  render();
+  loadEditor();
+}
+
+/* ---------- actions ---------- */
+
+async function taskAct(project, task, action) {
+  try { await api(`/api/tasks/${project}/${task}/${action}`, { method: "POST" }); }
+  catch (e) { toast(`${task} ${action}: ` + e.message); }
+  refresh();
+}
+
+async function projAct(project, action) {
+  try { await api(`/api/projects/${project}/${action}`, { method: "POST" }); }
+  catch (e) { toast(`${project} ${action}: ` + e.message); }
+  refresh();
+}
+
+async function removeProject(id) {
+  if (!confirm(`Remove project "${id}" from byob.yaml? Its running tasks will be stopped. The folder itself is NOT deleted.`)) return;
+  try { await api("/api/config/projects/" + id, { method: "DELETE" }); }
+  catch (e) { toast("remove: " + e.message); }
+  refresh();
+}
+
+/* ---------- logs ---------- */
+
+function openLogs(project, task) {
+  closeLogsWS();
+  logTask = { project, task };
+  const p = current();
+  $("logtabs").innerHTML = (p ? p.tasks.filter(t => !t.external) : [])
+    .map(t => `<button class="tab ${t.id === task ? "on" : ""}"
+      onclick="openLogs('${project}','${t.id}')">${esc(t.id)}</button>`).join("");
+  $("logbody").innerHTML = "";
+  $("logpane").classList.add("open");
+  logClose = Backend.openLogs(project, task, {
+    onEntry: entry => {
+      const div = document.createElement("div");
+      if (entry.stream === "err") div.className = "err";
+      const ts = new Date(entry.ts).toLocaleTimeString();
+      div.innerHTML = `<span class="ts">${ts}</span>${esc(entry.line)}`;
+      const body = $("logbody");
+      const stick = body.scrollTop + body.clientHeight >= body.scrollHeight - 8;
+      body.appendChild(div);
+      while (body.childNodes.length > 2000) body.removeChild(body.firstChild);
+      if (stick) body.scrollTop = body.scrollHeight;
+    },
+    onError: () => toast(`no logs for ${project}:${task} (not started yet?)`),
+  });
+}
+
+function closeLogsWS() {
+  if (logClose) { logClose(); logClose = null; }
+}
+
+function closeLogs() {
+  closeLogsWS();
+  logTask = null;
+  $("logpane").classList.remove("open");
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("logpane").classList.contains("open")) closeLogs();
+});
+
+/* ---------- PHP binaries view ---------- */
+
+function renderPHPView() {
+  $("mainhead").innerHTML = `<span class="pname">PHP binaries</span>
+    <span class="sep">·</span><span class="path">registered roots and discovered installs</span>`;
+  $("taskpane").innerHTML = `
+    <div class="section-label">Roots</div>
+    <div id="phproots"></div>
+    <form class="rowline" onsubmit="addRoot(event)">
+      <input class="input mono" name="path" required placeholder="C:\\laragon\\bin\\php" style="flex:1" aria-label="PHP root path">
+      <button type="submit" class="btn">+ add root</button>
+    </form>
+    <div class="section-label" style="margin-top:16px">Discovered installs</div>
+    <div id="phpinstalls"></div>`;
+  $("configpane").innerHTML = "";
+  refreshPHP();
+}
+
+async function refreshPHP() {
+  if (view !== "php") return;
+  try {
+    const php = await api("/api/php");
+    $("phproots").innerHTML = php.roots.map(r => `
+      <div class="rowline"><span class="mono">${esc(r)}</span>
+        <button class="btn danger" onclick="removeRoot('${esc(r).replace(/\\/g, "\\\\")}')">remove</button>
+      </div>`).join("") || `<div class="rowline" style="color:var(--faint)">no roots registered</div>`;
+    $("phpinstalls").innerHTML = php.installs.length
+      ? php.installs.map(i => `<div class="rowline"><span class="badge">${esc(i.version)}</span><span class="mono">${esc(i.path)}</span></div>`).join("")
+      : `<div class="rowline" style="color:var(--faint)">no PHP installs discovered</div>`;
+  } catch { /* daemon without config hooks */ }
+}
+
+async function addRoot(ev) {
+  ev.preventDefault();
+  const path = new FormData(ev.target).get("path");
+  try {
+    await api("/api/config/phproots", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    });
+    ev.target.reset();
+  } catch (e) { toast("add root: " + e.message); }
+  refreshPHP();
+}
+
+async function removeRoot(path) {
+  if (!confirm(`Remove PHP root "${path}"? Binaries on disk are NOT deleted.`)) return;
+  try {
+    await api("/api/config/phproots", {
+      method: "DELETE", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    });
+  } catch (e) { toast("remove root: " + e.message); }
+  refreshPHP();
+}
+
+/* ---------- live events ---------- */
+
+function connectEvents() {
+  Backend.openEvents({
+    onOpen: () => {
+      $("conn").className = "live"; $("conn").title = "live";
+      refresh();
+    },
+    onStatus: event => {
+      for (const p of state.projects)
+        for (const t of p.tasks)
+          if (t.key === event.key) {
+            t.status = event.status;
+            t.pid = event.pid || 0;
+          }
+      renderList();
+      if (view === "projects") renderMain();
+    },
+    onClose: () => {
+      $("conn").className = ""; $("conn").title = "reconnecting…";
+    },
+  });
+}
+
+refresh().then(loadEditor);
+connectEvents();
+</script>
+</body>
+</html>

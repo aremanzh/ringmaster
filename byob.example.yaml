@@ -1,0 +1,52 @@
+# byob.example.yaml — copy to byob.yaml and adjust paths.
+# byob.yaml is personal machine state and is gitignored.
+
+version: 1
+
+# Directories scanned for php-<version>* folders containing php.exe.
+php_roots:
+  - "C:\\laragon\\bin\\php"
+
+defaults:
+  # "127.0.0.1" (default) for this PC only. "lan" = this PC's current Wi-Fi/LAN
+  # IPv4, detected on every start, so phones on the network can reach it even
+  # after the router hands out a new address. Avoid hardcoding a LAN IP here.
+  host: "127.0.0.1"
+  # Used to allocate a port when a project does not declare one.
+  port_range: [8000, 8099]
+
+projects:
+  - id: "myapp"                      # unique slug, used as the CLI key
+    label: "My Laravel App"
+    path: "C:\\path\\to\\myapp"
+    php: "8.2"                       # version prefix matched against discovered PHPs
+    port: 8000                       # port for the primary task
+    tasks:
+      - id: "serve"
+        argv: ["{php}", "artisan", "serve", "--host={host}", "--port={port}"]
+        primary: true                # port is checked free before starting
+        ready: { type: "port" }      # poll the port until it accepts (30s)
+      - id: "vite"
+        argv: ["npm.cmd", "run", "dev", "--", "--host={host}"]
+        ready: { type: "stdout", match: "ready in" }   # scan stdout (60s)
+        cleanup: ["public/hot"]      # deleted on start/exit so a stopped Vite
+                                     # doesn't leave Laravel pointing at :5173
+      - id: "queue"
+        argv: ["{php}", "artisan", "queue:work", "--queue=high,low,default"]
+        autostart: false             # not started by `byob up`
+        restart: "on-failure"        # restarted on non-zero exit (max 5 in a row)
+
+# --- M3 examples ---
+# An externally-managed service byob only observes (status = port probe):
+#   - id: apache
+#     external: true
+#
+# A task that needs the Docker engine (clear preflight error when it's down):
+#   - id: sail
+#     requires_docker: true
+#     argv: ["docker", "compose", "up"]
+#
+# External tasks may declare their own port (default: the project port):
+#   - id: redis
+#     external: true
+#     port: 6379
