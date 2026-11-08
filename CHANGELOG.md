@@ -2,6 +2,19 @@
 
 Notable, user-facing changes. Newest first.
 
+## Unreleased
+
+- **Fixed: one busy port no longer takes everything down.** If an autostart
+  task could not start at launch (typically because another process held its
+  port), `ringmaster serve` and the desktop app exited and no project started.
+  Now the failure is shown on that task, e.g. "port 8101 on 127.0.0.1 is in use
+  by PID 1234 (php.exe)", and every other project starts normally. The message
+  clears on the next successful start.
+- **Fixed: no half-started projects.** When a project's primary task fails to
+  start, its other tasks (`vite`, `queue`) are no longer started on their own.
+- `examples/demo` runs its three projects on PHP 8.4, 8.3 and 8.2, and each page
+  shows the PHP version that served it.
+
 ## 0.1.1 — 2026-11-09
 
 - `ringmaster.exe` and `ringmaster-gui.exe` carry the Ringmaster icon and

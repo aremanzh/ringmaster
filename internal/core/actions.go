@@ -40,10 +40,9 @@ func (e *Engine) TaskAction(project, task, action string) error {
 	}
 	switch action {
 	case "start":
-		if err := e.sup.Start(spec); err != nil {
+		if err := e.startTask(spec); err != nil {
 			return conflict("%s", err)
 		}
-		e.onStart(key)
 	case "stop":
 		if err := e.sup.Stop(key); err != nil {
 			return conflict("%s", err)
@@ -66,11 +65,26 @@ func (e *Engine) restartTask(spec supervisor.TaskSpec) error {
 			return e.sup.Restart(spec.Key)
 		}
 	}
-	err := e.sup.Start(spec)
-	if err == nil {
-		e.onStart(spec.Key)
+	return e.startTask(spec)
+}
+
+// primaryFirst returns tasks with the primary task(s) moved to the front,
+// keeping the configured order otherwise. Starting the primary first lets a
+// caller skip a project's helper tasks (vite, queue) when the primary — the
+// one whose port is checked — cannot start.
+func primaryFirst(tasks []config.Task) []config.Task {
+	out := make([]config.Task, 0, len(tasks))
+	for _, t := range tasks {
+		if t.Primary {
+			out = append(out, t)
+		}
 	}
-	return err
+	for _, t := range tasks {
+		if !t.Primary {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // ProjectAction applies start/stop/restart to a whole project. start starts
@@ -108,8 +122,9 @@ func (e *Engine) ProjectAction(project, action string) error {
 				busy[info.Key] = true
 			}
 		}
-		for _, t := range p.Tasks {
-			if !t.AutostartEnabled() {
+		primaryFailed := false
+		for _, t := range primaryFirst(p.Tasks) {
+			if !t.AutostartEnabled() || (primaryFailed && !t.Primary) {
 				continue
 			}
 			key := project + ":" + t.ID
@@ -119,10 +134,11 @@ func (e *Engine) ProjectAction(project, action string) error {
 			if !ok || busy[key] {
 				continue
 			}
-			if err := e.sup.Start(spec); err != nil {
+			if err := e.startTask(spec); err != nil {
 				errs = append(errs, err.Error())
-			} else {
-				e.onStart(key)
+				if t.Primary {
+					primaryFailed = true
+				}
 			}
 		}
 	}

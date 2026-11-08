@@ -57,6 +57,10 @@ func (d *Daemon) Start() (*Running, error) {
 	// and skipped so the rest of the dashboard still comes up.
 	specs := map[string]supervisor.TaskSpec{}
 	projErrs := core.ProjectErrors{}
+	// An autostart task that fails (typically a busy port) is recorded on the
+	// task and the daemon keeps going, so one occupied port never takes the
+	// dashboard down. A failed primary skips the rest of its project.
+	startErrs := map[string]string{}
 	taken := TakenPorts(d.Cfg)
 	for _, p := range d.Cfg.Projects {
 		all, err := d.BuildAllSpecs(p, installs, taken)
@@ -73,12 +77,20 @@ func (d *Daemon) Start() (*Running, error) {
 		}
 		for _, s := range all {
 			specs[s.Spec.Key] = s.Spec
-			if !s.Autostart {
+		}
+		primaryFailed := false
+		for _, s := range primaryFirst(all) {
+			if !s.Autostart || (primaryFailed && !s.Spec.Primary) {
 				continue
 			}
 			fmt.Printf("starting %s\n", s.Spec.Key)
 			if err := sup.Start(s.Spec); err != nil {
-				return nil, err
+				fmt.Fprintf(os.Stderr, "ringmaster: %v\n", err)
+				startErrs[s.Spec.Key] = err.Error()
+				if s.Spec.Primary {
+					primaryFailed = true
+				}
+				continue
 			}
 			d.MirrorLogs(sup, s.Spec.Key)
 		}
@@ -91,7 +103,25 @@ func (d *Daemon) Start() (*Running, error) {
 		Discover:   d.discoverInstalls,
 	})
 	eng.SetProjectErrors(projErrs)
+	eng.SetStartErrors(startErrs)
 	return &Running{Engine: eng, sup: sup, d: d}, nil
+}
+
+// primaryFirst orders a project's spec entries with the primary task first,
+// keeping the configured order otherwise.
+func primaryFirst(all []SpecEntry) []SpecEntry {
+	out := make([]SpecEntry, 0, len(all))
+	for _, s := range all {
+		if s.Spec.Primary {
+			out = append(out, s)
+		}
+	}
+	for _, s := range all {
+		if !s.Spec.Primary {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // discoverInstalls adapts discover.Discover to the core.PHPInstall shape.

@@ -54,6 +54,9 @@ func (e *Engine) Status() []ProjectView {
 					tv.StartedAt = &ts
 				}
 			}
+			if tv.Status != supervisor.StatusStarting && tv.Status != supervisor.StatusRunning {
+				tv.StartError = e.startErrs[key]
+			}
 			pv.Tasks = append(pv.Tasks, tv)
 		}
 		out = append(out, pv)

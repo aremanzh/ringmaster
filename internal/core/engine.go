@@ -53,14 +53,19 @@ func (pe ProjectErrors) Error() string {
 }
 
 // Engine owns one Supervisor and the mutable config/spec view. mu guards cfg,
-// specs and projErrs, which the config-editing operations swap at runtime.
+// specs, projErrs and startErrs, which the config-editing operations and
+// start attempts update at runtime.
 type Engine struct {
 	sup      *supervisor.Supervisor
 	mu       sync.RWMutex
 	cfg      *config.Config
 	specs    map[string]supervisor.TaskSpec
 	projErrs ProjectErrors
-	cb       Callbacks
+	// startErrs holds, per task key, why the last start attempt failed (for
+	// example a busy port). Unlike projErrs it never blocks a retry; a
+	// successful start clears it.
+	startErrs map[string]string
+	cb        Callbacks
 }
 
 // New builds an Engine. specs must contain every task of every project that
@@ -79,6 +84,34 @@ func (e *Engine) SetProjectErrors(pe ProjectErrors) {
 
 // projectErrLocked requires e.mu held (read or write).
 func (e *Engine) projectErrLocked(id string) string { return e.projErrs[id] }
+
+// SetStartErrors records the tasks whose autostart failed at startup, keyed
+// by task key. Call it before the Engine is shared.
+func (e *Engine) SetStartErrors(errs map[string]string) {
+	e.mu.Lock()
+	e.startErrs = errs
+	e.mu.Unlock()
+}
+
+// startTask starts one task and records the outcome: a failure is kept as
+// the task's start error, a success clears it.
+func (e *Engine) startTask(spec supervisor.TaskSpec) error {
+	err := e.sup.Start(spec)
+	e.mu.Lock()
+	if err != nil {
+		if e.startErrs == nil {
+			e.startErrs = map[string]string{}
+		}
+		e.startErrs[spec.Key] = err.Error()
+	} else {
+		delete(e.startErrs, spec.Key)
+	}
+	e.mu.Unlock()
+	if err == nil {
+		e.onStart(spec.Key)
+	}
+	return err
+}
 
 // CanEditConfig reports whether config-editing operations are wired.
 func (e *Engine) CanEditConfig() bool { return e.cb.SaveConfig != nil }
@@ -107,6 +140,10 @@ type TaskView struct {
 	// External marks an observed-only service; status comes from a port probe,
 	// and start/stop/restart are rejected.
 	External bool `json:"external,omitempty"`
+	// StartError is why the last start attempt failed (e.g. "port 8101 on
+	// 127.0.0.1 is in use by PID 1234 (php.exe)"). Empty while the task is
+	// starting or running; cleared by the next successful start.
+	StartError string `json:"start_error,omitempty"`
 }
 
 // ProjectView is one project in a status snapshot.
