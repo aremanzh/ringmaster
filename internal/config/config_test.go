@@ -136,8 +136,10 @@ func TestValidateErrors(t *testing.T) {
 			wantErr: "duplicate task id",
 		},
 		{
-			name:    "empty argv",
-			mutate:  func(s string) string { return strings.Replace(s, `argv: ["{php}", "artisan", "queue:work"]`, `argv: []`, 1) },
+			name: "empty argv",
+			mutate: func(s string) string {
+				return strings.Replace(s, `argv: ["{php}", "artisan", "queue:work"]`, `argv: []`, 1)
+			},
 			wantErr: "argv must be a non-empty array",
 		},
 		{
@@ -171,8 +173,10 @@ func TestValidateErrors(t *testing.T) {
 			wantErr: "not a valid ascending port range",
 		},
 		{
-			name:    "more than one primary",
-			mutate:  func(s string) string { return strings.Replace(s, `ready: { type: "stdout", match: "ready in" }`, "primary: true", 1) },
+			name: "more than one primary",
+			mutate: func(s string) string {
+				return strings.Replace(s, `ready: { type: "stdout", match: "ready in" }`, "primary: true", 1)
+			},
 			wantErr: "more than one task marked primary",
 		},
 	}

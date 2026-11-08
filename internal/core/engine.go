@@ -111,10 +111,10 @@ type TaskView struct {
 
 // ProjectView is one project in a status snapshot.
 type ProjectView struct {
-	ID    string     `json:"id"`
-	Label string     `json:"label"`
-	Path  string     `json:"path"`
-	PHP   string     `json:"php,omitempty"`
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	Path  string `json:"path"`
+	PHP   string `json:"php,omitempty"`
 	// Error is set when the project's tasks could not be built (e.g. its path
 	// does not exist); none of its tasks can be started until it is fixed.
 	Error string     `json:"error,omitempty"`
