@@ -2,7 +2,7 @@
 
 Notable, user-facing changes. Newest first.
 
-## Unreleased
+## 0.1.2 — 2026-11-09
 
 - **Fixed: one busy port no longer takes everything down.** If an autostart
   task could not start at launch (typically because another process held its
