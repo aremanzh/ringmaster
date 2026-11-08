@@ -2,7 +2,7 @@
 
 Notable, user-facing changes. Newest first.
 
-## Unreleased
+## 0.1.1 — 2026-11-09
 
 - `ringmaster.exe` and `ringmaster-gui.exe` carry the Ringmaster icon and
   Windows version info (product name, version, description); release builds
