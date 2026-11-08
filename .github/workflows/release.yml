@@ -25,6 +25,12 @@ jobs:
         env:
           VERSION: ${{ github.ref_name }}
         run: |
+          # Re-stamp the icon resources with this release's version.
+          $winres = @('run', 'github.com/tc-hib/go-winres@v0.3.3', 'simply', '--arch', 'amd64', '--manifest', 'none',
+            '--icon', 'assets/icon/ringmaster.ico', '--product-name', 'Ringmaster',
+            '--product-version', $env:VERSION, '--file-version', $env:VERSION)
+          go @winres --file-description 'Ringmaster CLI' --original-filename ringmaster.exe --out cmd/ringmaster/rsrc
+          go @winres --file-description 'Ringmaster desktop app' --original-filename ringmaster-gui.exe --out cmd/ringmaster-gui/rsrc
           $ld = "-s -w -X main.version=$env:VERSION"
           go build -ldflags $ld -o dist/ringmaster.exe ./cmd/ringmaster
           go build -tags gui,desktop,production -ldflags "$ld -H windowsgui" -o dist/ringmaster-gui.exe ./cmd/ringmaster-gui

@@ -4,6 +4,22 @@ Notable, user-facing changes. Newest first.
 
 ## Unreleased
 
+- `ringmaster.exe` and `ringmaster-gui.exe` carry the Ringmaster icon and
+  Windows version info (product name, version, description); release builds
+  stamp the tag's version into it.
+- The web UI has a favicon.
+- `examples/demo`: three invented projects (`shop`, `blog`, `crm`) with
+  simulated Vite and queue processes, for trying Ringmaster without a real
+  Laravel app.
+
+## 0.1.0 — 2026-10-23
+
+First public release.
+
+- Renamed from byob to Ringmaster.
+- `ringmaster -version` (or `ringmaster version`) prints the version.
+- Pushing a `v*` tag builds both binaries on GitHub Actions and publishes
+  `ringmaster_<tag>_windows_amd64.zip` with a SHA-256 checksum.
 - **Fixed: duplicate default ports.** Projects that omit `port` are now each
   allocated a **unique** port from `defaults.port_range`. Previously every
   port-less project was handed the first bindable port (usually 8000) because

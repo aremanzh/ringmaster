@@ -1,0 +1,57 @@
+# Demo registry: three invented projects for trying Ringmaster or recording
+# a demo. Run from this folder (project paths are relative to it):
+#
+#   cd examples\demo
+#   ..\..\ringmaster.exe serve
+#
+# The "vite" and "queue" tasks are small simulations (fake-vite.js,
+# worker.php) so no real Laravel app or npm install is needed.
+version: 1
+php_roots:
+  - C:\laragon\bin\php   # change to the folder that holds your php-8.x installs
+defaults:
+  host: 127.0.0.1
+projects:
+  - id: shop
+    label: Shop
+    path: shop
+    php: "8"
+    port: 8101
+    tasks:
+      - id: serve
+        argv: ["{php}", "-S", "{host}:{port}", "-t", "public"]
+        primary: true
+        ready: { type: port }
+      - id: vite
+        argv: ["node", "../fake-vite.js"]
+        ready: { type: stdout, match: "ready in" }
+      - id: queue
+        argv: ["{php}", "../worker.php"]
+        autostart: false
+        restart: on-failure
+  - id: blog
+    label: Blog
+    path: blog
+    php: "8"
+    port: 8102
+    tasks:
+      - id: serve
+        argv: ["{php}", "-S", "{host}:{port}", "-t", "public"]
+        primary: true
+        ready: { type: port }
+      - id: vite
+        argv: ["node", "../fake-vite.js"]
+        ready: { type: stdout, match: "ready in" }
+  - id: crm
+    label: CRM
+    path: crm
+    php: "8"
+    port: 8103
+    tasks:
+      - id: serve
+        argv: ["{php}", "-S", "{host}:{port}", "-t", "public"]
+        primary: true
+        ready: { type: port }
+      - id: queue
+        argv: ["{php}", "../worker.php"]
+        restart: on-failure

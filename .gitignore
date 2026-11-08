@@ -1,5 +1,5 @@
 # Personal machine config — commit ringmaster.example.yaml instead.
-ringmaster.yaml
+/ringmaster.yaml
 
 # Machine-local runtime state.
 ringmaster.state.json
@@ -12,3 +12,6 @@ ringmaster.exe~
 ringmaster-gui.exe
 ringmaster-gui.exe~
 ringmaster.daemon.json
+
+# Demo recordings are published on GitHub, not stored in git.
+*.mp4

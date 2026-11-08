@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Ringmaster">
+  <circle cx="32" cy="32" r="20" fill="none" stroke="#16181D" stroke-width="6"/>
+  <circle cx="32" cy="12" r="7" fill="#E8A33D"/>
+  <circle cx="14.68" cy="42" r="7" fill="#16181D"/>
+  <circle cx="49.32" cy="42" r="7" fill="#16181D"/>
+</svg>

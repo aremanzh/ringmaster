@@ -1,4 +1,10 @@
-# Ringmaster
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo/mark-dark.svg">
+    <img src="assets/logo/mark.svg" width="40" height="40" alt="">
+  </picture>
+  Ringmaster
+</h1>
 
 Bring your own binaries. Ringmaster runs all your local Laravel and PHP projects from one place on Windows, using the PHP and Node already installed on your machine.
 
@@ -41,6 +47,8 @@ copy ringmaster.example.yaml ringmaster.yaml
 `ringmaster-gui.exe` runs the same projects in a desktop window instead of a browser. It needs the WebView2 runtime, which ships with Windows 11.
 
 The binaries are not code-signed yet, so Windows SmartScreen warns the first time you run them.
+
+To try it before pointing it at your own projects, [`examples/demo`](examples/demo/ringmaster.yaml) has three small invented projects (`shop`, `blog`, `crm`) with simulated Vite and queue processes. Set `php_roots` in that file, then run `..\..\ringmaster.exe serve` from that folder.
 
 A typical Laravel project in `ringmaster.yaml`:
 
@@ -166,6 +174,13 @@ go test ./...
 ```
 
 Pushing a `v*` tag builds both binaries on GitHub Actions and publishes them as a release.
+
+The icon is drawn by `go run ./tools/genassets`, which writes `assets/icon/ringmaster.ico`, a 256 px PNG and the UI's `favicon.png`. The `.syso` files that put the icon into each `.exe` come from that `.ico`:
+
+```powershell
+go run github.com/tc-hib/go-winres@v0.3.3 simply --arch amd64 --manifest none --icon assets/icon/ringmaster.ico --product-name Ringmaster --product-version v0.0.0 --file-version v0.0.0 --file-description "Ringmaster CLI" --original-filename ringmaster.exe --out cmd/ringmaster/rsrc
+go run github.com/tc-hib/go-winres@v0.3.3 simply --arch amd64 --manifest none --icon assets/icon/ringmaster.ico --product-name Ringmaster --product-version v0.0.0 --file-version v0.0.0 --file-description "Ringmaster desktop app" --original-filename ringmaster-gui.exe --out cmd/ringmaster-gui/rsrc
+```
 
 Package layout: `internal/config` (YAML, validation, interpolation, LAN host detection), `internal/discover` (PHP discovery and version resolution), `internal/proc` (process groups and the Windows Job Object), `internal/portcheck` (free-port check and port-holder lookup), `internal/supervisor` (lifecycle, readiness, logs, state, reaping, status events), `internal/core` and `internal/daemon` (the engine shared by `ringmaster serve` and the desktop app), `internal/api` (REST, WebSocket, embedded UI), `cmd/ringmaster` (CLI and serve daemon), `cmd/ringmaster-gui` (desktop app).
 
