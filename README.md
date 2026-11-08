@@ -10,7 +10,9 @@ Bring your own binaries. Ringmaster runs all your local Laravel and PHP projects
 
 ## The problem
 
-Each Laravel app you work on wants three or four processes: `php artisan serve`, `npm run dev`, a queue worker, sometimes a Node API or its own Apache. With five client projects open, that is a wall of terminals.
+Your projects don't all run on the same PHP. A new app is on 8.4, last year's client site is pinned to 8.2, and an older system can't be upgraded yet. Laragon and most Windows stacks give you one active PHP at a time, so working on two of them means switching versions, restarting, and remembering which terminal used which `php.exe`.
+
+Each of those apps also wants three or four processes: `php artisan serve`, `npm run dev`, a queue worker, sometimes a Node API or its own Apache. With five client projects open, that is a wall of terminals.
 
 Windows makes this worse. Close a terminal and `php.exe`, `node.exe` or `esbuild.exe` can keep running in the background, still holding the port. The next start fails with "address already in use", and you go hunting with `netstat -ano` and `taskkill`. Two apps that both default to port 8000 collide. If you test on your phone over the LAN, a router restart hands your PC a new IP and the config you wrote yesterday stops working.
 
@@ -18,11 +20,11 @@ Laravel's `php artisan dev` helps with one project in one terminal. Ringmaster i
 
 ## What Ringmaster does
 
+- Each project runs on its own PHP version, all at the same time. `php: "8.2"` on one project and `php: "8.4"` on the next resolve to real `php.exe` installs from your PHP folders (Laragon's `bin\php` works) or from PATH. Nothing global is switched.
 - One daemon supervises every project. You control it from a web UI, a desktop app or the CLI, with live status, start/stop/restart per task, and live logs.
 - Stopping a task stops its whole process tree. Ringmaster puts every task in a Windows Job Object, so child processes such as Vite's `esbuild.exe` die with it and the port is freed.
 - Before starting a project, Ringmaster checks its port. If something holds it, Ringmaster tells you the PID and the program name.
 - Projects without a fixed port get a unique one from a range, so two Laravel apps never both land on 8000.
-- `php: "8.3"` in the config resolves to a real `php.exe` from your PHP folders (Laragon's `bin\php` works) or from PATH.
 - `host: lan` binds to your current LAN IP and re-detects it on every start, so phone testing survives a DHCP change.
 - After a crash, Ringmaster cleans up the processes it started, and checks each PID's identity first so it never kills an unrelated program that reused the number.
 
@@ -48,7 +50,7 @@ copy ringmaster.example.yaml ringmaster.yaml
 
 The binaries are not code-signed yet, so Windows SmartScreen warns the first time you run them.
 
-To try it before pointing it at your own projects, [`examples/demo`](examples/demo/ringmaster.yaml) has three small invented projects (`shop`, `blog`, `crm`) with simulated Vite and queue processes. Set `php_roots` in that file, then run `..\..\ringmaster.exe serve` from that folder.
+To try it before pointing it at your own projects, [`examples/demo`](examples/demo/ringmaster.yaml) has three small invented projects (`shop`, `blog`, `crm`) on PHP 8.4, 8.3 and 8.2, with simulated Vite and queue processes. Each page shows the PHP version that served it. Set `php_roots` and the versions to ones you have in that file, then run `..\..\ringmaster.exe serve` from that folder.
 
 A typical Laravel project in `ringmaster.yaml`:
 

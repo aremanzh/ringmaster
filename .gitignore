@@ -13,5 +13,6 @@ ringmaster-gui.exe
 ringmaster-gui.exe~
 ringmaster.daemon.json
 
-# Demo recordings are published on GitHub, not stored in git.
+# Demo recordings and their soundtracks are published on GitHub, not stored in git.
 *.mp4
+*.wav

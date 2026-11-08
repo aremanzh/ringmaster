@@ -6,16 +6,20 @@
 #
 # The "vite" and "queue" tasks are small simulations (fake-vite.js,
 # worker.php) so no real Laravel app or npm install is needed.
+#
+# Each project pins a different PHP version (8.4, 8.3, 8.2), all running at
+# the same time. Each page shows the PHP version that served it. Change the
+# versions to ones you have installed: "8" matches any 8.x, "8.2" any 8.2.x.
 version: 1
 php_roots:
-  - C:\laragon\bin\php   # change to the folder that holds your php-8.x installs
+  - C:\laragon\bin\php   # change to the folder that holds your php-x.y installs
 defaults:
   host: 127.0.0.1
 projects:
   - id: shop
     label: Shop
     path: shop
-    php: "8"
+    php: "8.4"
     port: 8101
     tasks:
       - id: serve
@@ -32,7 +36,7 @@ projects:
   - id: blog
     label: Blog
     path: blog
-    php: "8"
+    php: "8.3"
     port: 8102
     tasks:
       - id: serve
@@ -45,7 +49,7 @@ projects:
   - id: crm
     label: CRM
     path: crm
-    php: "8"
+    php: "8.2"
     port: 8103
     tasks:
       - id: serve

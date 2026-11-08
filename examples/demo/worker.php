@@ -1,12 +1,14 @@
 <?php
 // Simulated `php artisan queue:work` for the Ringmaster demo: prints a job
-// every few seconds until stopped.
+// every few seconds until stopped. Ringmaster timestamps each log line, so
+// the worker prints none of its own.
 $jobs = ['App\Jobs\SendInvoice', 'App\Jobs\ResizeImage', 'App\Jobs\SyncInventory'];
-echo "   INFO  Processing jobs from the [default] queue.\n\n";
+echo "   INFO  Processing jobs from the [default] queue on PHP " . PHP_VERSION . ".\n\n";
 for ($i = 0; ; $i++) {
     sleep(4);
     $job = $jobs[$i % count($jobs)];
-    printf("  %s %s %s RUNNING\n", date('Y-m-d H:i:s'), $job, str_repeat('.', 40 - strlen($job)));
+    $dots = str_repeat('.', 40 - strlen($job));
+    echo "  $job $dots RUNNING\n";
     usleep(300000);
-    printf("  %s %s %s 300ms DONE\n", date('Y-m-d H:i:s'), $job, str_repeat('.', 40 - strlen($job)));
+    echo "  $job $dots 300ms DONE\n";
 }
