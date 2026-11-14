@@ -198,6 +198,13 @@
   .check { display: flex; align-items: center; gap: 6px; font-size: 11px;
     color: var(--muted); cursor: pointer; user-select: none; }
   .check input { accent-color: var(--accent); }
+  .taskmore { margin-top: 6px; }
+  .taskmore summary { font-size: 11px; color: var(--faint); cursor: pointer;
+    user-select: none; }
+  .taskmore summary:hover { color: var(--muted); }
+  .taskmore .field { margin: 6px 0 0; }
+  .taskmore textarea.input { resize: vertical; min-height: 44px;
+    line-height: 1.5; }
   .addline { background: none; border: 1px dashed var(--border);
     border-radius: var(--radius); color: var(--faint); font-size: 11px;
     padding: 4px 8px; cursor: pointer; width: 100%; text-align: left;
@@ -528,7 +535,33 @@ function taskRowHTML(t, i) {
         <option value="always" ${t.restart === "always" ? "selected" : ""}>always</option>
       </select>
     </div>
+    <details class="taskmore" ${t.cwd || envToText(t.env) || t._more ? "open" : ""}
+      ontoggle="edTask(${i},'_more',this.open)">
+      <summary>folder and environment${t.cwd || envToText(t.env) ? " (set)" : ""}</summary>
+      <div class="field"><label>Run in subfolder</label>
+        <input class="input mono" value="${esc(t.cwd || "")}" placeholder="frontend (empty = the project folder)"
+          onchange="edTask(${i},'cwd',this.value)" aria-label="task subfolder"></div>
+      <div class="field"><label>Environment variables, one KEY=value per line</label>
+        <textarea class="input mono" rows="2" placeholder="APP_URL=http://{host}:{port}"
+          onchange="edTask(${i},'env',this.value)" aria-label="task environment">${esc(envToText(t.env))}</textarea></div>
+    </details>
   </div>`;
+}
+
+// env map <-> "KEY=value" lines. textToEnv returns null for a line that has
+// no "=", so a typo is reported instead of silently dropped.
+function envToText(env) {
+  return Object.keys(env || {}).sort().map(k => `${k}=${env[k]}`).join("\n");
+}
+
+function textToEnv(s) {
+  const env = {};
+  for (const line of s.split("\n").map(l => l.trim()).filter(Boolean)) {
+    const i = line.indexOf("=");
+    if (i < 1) return null;
+    env[line.slice(0, i).trim()] = line.slice(i + 1);
+  }
+  return env;
 }
 
 // argv <-> one editable line. Args containing whitespace are wrapped in double
@@ -546,6 +579,13 @@ function edTask(i, field, value) {
   if (!t) return;
   if (field === "argv") t.argv = textToArgv(value);
   else if (field === "autostart") t.autostart = value ? null : false;
+  else if (field === "cwd") { if (value.trim()) t.cwd = value.trim(); else delete t.cwd; }
+  else if (field === "env") {
+    const env = textToEnv(value);
+    if (!env) { toast("environment: every line must be KEY=value"); t._envError = true; return; }
+    delete t._envError;
+    if (Object.keys(env).length) t.env = env; else delete t.env;
+  }
   else t[field] = value;
 }
 
@@ -612,9 +652,14 @@ async function saveEditor() {
   if (!d.tasks.length || d.tasks.some(t => !t.id)) {
     toast("every task needs a name"); return;
   }
+  if (d.tasks.some(t => t._envError)) {
+    toast("environment: every line must be KEY=value"); return;
+  }
+  // Keys starting with "_" are editor state, not config.
+  const tasks = d.tasks.map(t => Object.fromEntries(Object.entries(t).filter(([k]) => !k.startsWith("_"))));
   const body = JSON.stringify({
     id: d.id, label: d.label, path: d.path, php: d.php, port: d.port,
-    tasks: d.tasks,
+    tasks,
   });
   try {
     if (editorMode === "add") {

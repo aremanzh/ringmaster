@@ -2,6 +2,12 @@
 
 Notable, user-facing changes. Newest first.
 
+## Unreleased
+
+- The project editor has fields for a task's subfolder (`cwd`) and environment
+  variables (`env`), under "folder and environment" on each task. Until now
+  they could only be set in `ringmaster.yaml`.
+
 ## 0.2.0 — 2026-11-14
 
 - **New: no YAML needed to get started.** `ringmaster serve` and the desktop
