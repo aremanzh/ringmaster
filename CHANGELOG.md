@@ -2,6 +2,13 @@
 
 Notable, user-facing changes. Newest first.
 
+## Unreleased
+
+- **Fixed: a task that exited right away had an empty log.** Whatever a
+  process printed just before exiting was thrown away, so a task that crashed
+  on startup (a missing `artisan`, a syntax error) showed as `failed` with no
+  reason. Every line is now kept, and the exit status is logged after it.
+
 ## 0.1.3 — 2026-11-14
 
 - **Security: other web pages can no longer drive the API.** While
