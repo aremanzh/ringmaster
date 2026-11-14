@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -34,20 +37,38 @@ func (a *app) serve(rest []string) error {
 	var shutdownOnce sync.Once
 	onShutdown := func() { shutdownOnce.Do(func() { close(shutdownReq) }) }
 
+	// Beyond loopback, anyone who can reach the port could run commands on
+	// this machine, so the API then requires a per-run access token.
+	apiSrv := api.NewWithEngine(run.Engine, onShutdown)
+	token := ""
+	if !api.LoopbackOnly(*listen) {
+		if token, err = newToken(); err != nil {
+			run.Stop()
+			return err
+		}
+		apiSrv.RequireToken(token)
+	}
+
 	srv := &http.Server{
 		Addr:    *listen,
-		Handler: api.NewWithEngine(run.Engine, onShutdown).Handler(),
+		Handler: apiSrv.Handler(),
 	}
 	serveErr := make(chan error, 1)
 	go func() {
-		fmt.Printf("web UI on http://%s — Ctrl+C to stop\n", *listen)
+		if token == "" {
+			fmt.Printf("web UI on http://%s — Ctrl+C to stop\n", *listen)
+		} else {
+			fmt.Printf("web UI on http://%s/?token=%s — Ctrl+C to stop\n", localAddr(*listen), token)
+			fmt.Printf("%s is reachable from the network, so the UI and API need that token.\n", *listen)
+			fmt.Println("From another device, use this PC's address with the same ?token=... (it changes on every start).")
+		}
 		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			serveErr <- err
 		}
 	}()
 
 	// Publish the discovery record so the other subcommands find us.
-	if err := writeDaemonInfo(a.daemonPath(), daemonInfo{Addr: *listen, PID: os.Getpid()}); err != nil {
+	if err := writeDaemonInfo(a.daemonPath(), daemonInfo{Addr: *listen, PID: os.Getpid(), Token: token}); err != nil {
 		fmt.Fprintf(os.Stderr, "ringmaster: write %s: %v\n", a.daemonPath(), err)
 	}
 	defer os.Remove(a.daemonPath())
@@ -70,4 +91,26 @@ func (a *app) serve(rest []string) error {
 	run.Stop()
 	fmt.Println("stopped")
 	return nil
+}
+
+// newToken returns a random 128-bit access token in hex.
+func newToken() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("generate access token: %w", err)
+	}
+	return hex.EncodeToString(b), nil
+}
+
+// localAddr turns a listen address into one this machine can dial: a
+// wildcard or empty host (":9090", "0.0.0.0:9090") becomes loopback.
+func localAddr(listen string) string {
+	host, port, err := net.SplitHostPort(listen)
+	if err != nil {
+		return listen
+	}
+	if ip := net.ParseIP(host); host == "" || (ip != nil && ip.IsUnspecified()) {
+		host = "127.0.0.1"
+	}
+	return net.JoinHostPort(host, port)
 }

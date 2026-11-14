@@ -173,6 +173,7 @@ func TestGetProjectRoundTrip(t *testing.T) {
 
 	data, _ := json.Marshal(got)
 	req, _ := http.NewRequest(http.MethodPut, srv.URL+"/api/config/projects/rt", bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
 	pres, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -213,6 +214,7 @@ func TestAddAndRemovePHPRoot(t *testing.T) {
 
 	data, _ := json.Marshal(map[string]string{"path": root})
 	req, _ := http.NewRequest(http.MethodDelete, srv.URL+"/api/config/phproots", bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
 	dres, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)

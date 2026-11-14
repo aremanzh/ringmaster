@@ -22,6 +22,9 @@ import (
 type daemonInfo struct {
 	Addr string `json:"addr"` // host:port the API listens on
 	PID  int    `json:"pid"`
+	// Token is the API access token; set only when the daemon listens beyond
+	// loopback.
+	Token string `json:"token,omitempty"`
 }
 
 // daemonPath is the discovery file location, next to the state file.
@@ -34,7 +37,8 @@ func writeDaemonInfo(path string, info daemonInfo) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	// Owner-only: the file may hold the access token.
+	return os.WriteFile(path, data, 0o600)
 }
 
 // daemon returns a client for the running daemon, or nil if none is
@@ -49,24 +53,43 @@ func (a *app) daemon() *daemonClient {
 		return nil
 	}
 	c := &daemonClient{
-		base: "http://" + info.Addr,
+		base:  "http://" + localAddr(info.Addr),
+		token: info.Token,
 		// Actions can legitimately take a while (each task stop allows a
 		// grace period before the hard kill), so the timeout is generous.
 		http: &http.Client{Timeout: 60 * time.Second},
 	}
 	// Reachability probe with a short deadline of its own.
 	probe := &http.Client{Timeout: 2 * time.Second}
-	if res, err := probe.Get(c.base + "/api/status"); err != nil {
+	res, err := c.do(probe, http.MethodGet, "/api/status")
+	if err != nil {
 		return nil // stale file (daemon crashed); fall back to file layer
-	} else {
-		res.Body.Close()
 	}
+	res.Body.Close()
 	return c
 }
 
 type daemonClient struct {
-	base string
-	http *http.Client
+	base  string
+	token string
+	http  *http.Client
+}
+
+// do sends a body-less request to the daemon, with the access token when the
+// daemon requires one.
+func (c *daemonClient) do(client *http.Client, method, path string) (*http.Response, error) {
+	req, err := http.NewRequest(method, c.base+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	c.authorize(req.Header)
+	return client.Do(req)
+}
+
+func (c *daemonClient) authorize(h http.Header) {
+	if c.token != "" {
+		h.Set("Authorization", "Bearer "+c.token)
+	}
 }
 
 // statusResponse mirrors the /api/status JSON shape.
@@ -85,7 +108,7 @@ type statusResponse struct {
 }
 
 func (c *daemonClient) status() (*statusResponse, error) {
-	res, err := c.http.Get(c.base + "/api/status")
+	res, err := c.do(c.http, http.MethodGet, "/api/status")
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +125,7 @@ func (c *daemonClient) status() (*statusResponse, error) {
 
 // post sends an action request and surfaces the daemon's error message.
 func (c *daemonClient) post(path string) error {
-	res, err := c.http.Post(c.base+path, "", nil)
+	res, err := c.do(c.http, http.MethodPost, path)
 	if err != nil {
 		return err
 	}
@@ -165,7 +188,9 @@ func (c *daemonClient) logsRemote(project, task string) error {
 	defer stop()
 
 	url := "ws" + c.base[len("http"):] + "/api/tasks/" + project + "/" + task + "/logs/ws"
-	conn, res, err := websocket.Dial(ctx, url, nil)
+	header := http.Header{}
+	c.authorize(header)
+	conn, res, err := websocket.Dial(ctx, url, &websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		if res != nil && res.StatusCode == http.StatusNotFound {
 			return fmt.Errorf("no logs for %s:%s (task not started yet)", project, task)

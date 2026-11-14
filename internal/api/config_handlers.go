@@ -7,16 +7,33 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"mime"
 	"net/http"
 
 	"github.com/aremanzh/ringmaster/internal/core"
 )
 
+// decodeJSON reads a JSON request body into v. It insists on
+// Content-Type: application/json, which a cross-origin page cannot send
+// without a CORS preflight this server never answers, and bounds the body
+// size. It returns false after writing the error response.
+func decodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
+	if mt, _, err := mime.ParseMediaType(r.Header.Get("Content-Type")); err != nil || mt != "application/json" {
+		writeErr(w, http.StatusUnsupportedMediaType, errors.New("Content-Type must be application/json"))
+		return false
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxBodyBytes)).Decode(v); err != nil {
+		writeErr(w, http.StatusBadRequest, fmt.Errorf("bad json: %w", err))
+		return false
+	}
+	return true
+}
+
 func (s *Server) handleAddProject(w http.ResponseWriter, r *http.Request) {
 	var spec core.ProjectSpec
-	if err := json.NewDecoder(r.Body).Decode(&spec); err != nil {
-		writeErr(w, http.StatusBadRequest, fmt.Errorf("bad json: %w", err))
+	if !decodeJSON(w, r, &spec) {
 		return
 	}
 	if err := s.eng.AddProject(spec); err != nil {
@@ -40,8 +57,7 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 // is authoritative; running tasks keep their old spec until restarted.
 func (s *Server) handleUpdateProject(w http.ResponseWriter, r *http.Request) {
 	var spec core.ProjectSpec
-	if err := json.NewDecoder(r.Body).Decode(&spec); err != nil {
-		writeErr(w, http.StatusBadRequest, fmt.Errorf("bad json: %w", err))
+	if !decodeJSON(w, r, &spec) {
 		return
 	}
 	if err := s.eng.UpdateProject(r.PathValue("project"), spec); err != nil {
@@ -66,8 +82,7 @@ type phpRootRequest struct {
 
 func (s *Server) handleAddPHPRoot(w http.ResponseWriter, r *http.Request) {
 	var req phpRootRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeErr(w, http.StatusBadRequest, fmt.Errorf("bad json: %w", err))
+	if !decodeJSON(w, r, &req) {
 		return
 	}
 	if err := s.eng.AddPHPRoot(req.Path); err != nil {
@@ -79,8 +94,7 @@ func (s *Server) handleAddPHPRoot(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeletePHPRoot(w http.ResponseWriter, r *http.Request) {
 	var req phpRootRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeErr(w, http.StatusBadRequest, fmt.Errorf("bad json: %w", err))
+	if !decodeJSON(w, r, &req) {
 		return
 	}
 	if err := s.eng.DeletePHPRoot(req.Path); err != nil {

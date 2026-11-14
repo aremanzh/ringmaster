@@ -104,3 +104,11 @@ func TestUIServed(t *testing.T) {
 		t.Fatalf("status = %d, want 200", res.StatusCode)
 	}
 }
+
+// newTestHTTPServer serves s over a loopback test listener.
+func newTestHTTPServer(t *testing.T, s *Server) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(s.Handler())
+	t.Cleanup(srv.Close)
+	return srv
+}

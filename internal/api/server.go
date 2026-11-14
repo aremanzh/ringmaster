@@ -41,6 +41,8 @@ type PHPInstall = core.PHPInstall
 type Server struct {
 	eng        *core.Engine
 	onShutdown func()
+	// token, when non-empty, must accompany every request (see RequireToken).
+	token string
 }
 
 // New builds the API server. specs must contain every task of every project.
@@ -62,7 +64,8 @@ func NewWithEngine(eng *core.Engine, onShutdown func()) *Server {
 	return &Server{eng: eng, onShutdown: onShutdown}
 }
 
-// Handler returns the full route table, UI included.
+// Handler returns the full route table, UI included, behind the request
+// guards in security.go.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/status", s.handleStatus)
@@ -93,7 +96,7 @@ func (s *Server) Handler() http.Handler {
 		})
 	}
 	mux.Handle("GET /", uiHandler())
-	return mux
+	return s.guard(mux)
 }
 
 // handleStatus merges the static config with the supervisor's live snapshot.
