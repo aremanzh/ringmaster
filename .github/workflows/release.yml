@@ -85,6 +85,32 @@ jobs:
           # LF line ending, so `sha256sum -c` works on any platform.
           [IO.File]::WriteAllText("$PWD/$zip.sha256", "$hash  $zip`n")
 
+      # The release page shows this version's CHANGELOG.md entry. GitHub's
+      # generated notes only list merged pull requests, which says little here.
+      # Hard-wrapped bullets are joined into one line each: release notes
+      # render every newline as a line break.
+      - name: Release notes
+        shell: bash
+        run: |
+          awk -v version="${VERSION#v}" '
+            { sub(/\r$/, "") }
+            /^## / {
+              if (found) exit
+              if (index($0, "## " version " ") == 1) found = 1
+              next
+            }
+            !found { next }
+            /^  [^ ]/ && line != "" { sub(/^  /, ""); line = line " " $0; next }
+            { if (line != "") print line; line = $0 }
+            END { if (line != "") print line }
+          ' CHANGELOG.md > release-notes.md
+          if [ -s release-notes.md ]; then
+            echo "NOTES_FILE=release-notes.md" >> "$GITHUB_ENV"
+            cat release-notes.md
+          else
+            echo "no CHANGELOG.md entry for ${VERSION#v}; using generated notes"
+          fi
+
       # Manual run only, and only once everything above passed, so a failed
       # build never leaves a tag behind. An annotated tag, like the pushed ones.
       - name: Tag
@@ -102,4 +128,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $zip = "ringmaster_${env:VERSION}_windows_amd64.zip"
-          gh release create $env:VERSION $zip "$zip.sha256" --title $env:VERSION --generate-notes
+          if ($env:NOTES_FILE) {
+            gh release create $env:VERSION $zip "$zip.sha256" --title $env:VERSION --notes-file $env:NOTES_FILE
+          } else {
+            gh release create $env:VERSION $zip "$zip.sha256" --title $env:VERSION --generate-notes
+          }
