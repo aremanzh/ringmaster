@@ -90,3 +90,16 @@ func resolveExe(name string, dirs []string) (string, error) {
 	}
 	return exec.LookPath(name)
 }
+
+// CommandArgv prepares argv for a one-off command the way a task's is: a
+// bare argv[0] is looked up in dirs first, and a .cmd/.bat script is run
+// through cmd.exe.
+func CommandArgv(argv []string, dirs []string) ([]string, error) {
+	return wrapArgvIn(argv, dirs)
+}
+
+// CommandEnv returns the environment for a one-off command: this process's
+// environment with prepend in front of PATH, or nil (inherit) without one.
+func CommandEnv(prepend []string) []string {
+	return taskEnv(nil, prepend)
+}

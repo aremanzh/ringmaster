@@ -44,6 +44,7 @@ copy ringmaster.example.yaml ringmaster.yaml
 .\ringmaster.exe logs myapp:serve  # print buffer, then tail
 .\ringmaster.exe down myapp        # stop everything, free the port
 .\ringmaster.exe restart myapp
+.\ringmaster.exe run myapp php artisan migrate   # one-off command on the project's PHP
 ```
 
 `ringmaster-gui.exe` runs the same projects in a desktop window instead of a browser. It needs the WebView2 runtime, which ships with Windows 11.
@@ -92,6 +93,7 @@ See [`ringmaster.example.yaml`](ringmaster.example.yaml) for every option.
 | `ringmaster restart <projectId>` | `down` then `up`. |
 | `ringmaster ps` | Show recorded tasks; each PID is verified (running / dead / recycled). |
 | `ringmaster logs <projectId>[:<taskId>]` | Print the buffered log and tail live. Bare project id defaults to the primary task. |
+| `ringmaster run <projectId> [--] <command>` | Run a one-off command in the project folder with the project's PHP first on `PATH`: `ringmaster run shop php artisan migrate`, `ringmaster run shop composer install`, `ringmaster run shop php artisan tinker`. It runs in your terminal, is not supervised, works with or without the daemon, and exits with the command's exit code. |
 
 `-config path\to\ringmaster.yaml` selects a config; `ringmaster.state.json` and log files live next to it.
 

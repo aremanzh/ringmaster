@@ -110,35 +110,14 @@ func (d *Daemon) BuildAllSpecs(p config.Project, installs []discover.Install, ta
 		}
 	}
 
-	// Resolve PHP when the project names a version or some task references
-	// {php}, so a node-only project does not require PHP at all.
-	phpPath := ""
-	if p.PHP != "" || projectUsesPHP(p) {
-		if p.PHP == "" {
-			vers := make([]string, len(installs))
-			for i, in := range installs {
-				vers[i] = in.Version
-			}
-			found := strings.Join(vers, ", ")
-			if found == "" {
-				found = "none — check php_roots"
-			}
-			return nil, fmt.Errorf("project %s: tasks use {php} but no `php` version is set (installed: %s)", p.ID, found)
-		}
-		in, err := discover.Resolve(installs, p.PHP)
-		if err != nil {
-			return nil, fmt.Errorf("project %s: %w", p.ID, err)
-		}
-		phpPath = in.Path
-		fmt.Printf("project %s: php %s → %s\n", p.ID, p.PHP, in.Path)
+	phpPath, err := ProjectPHP(p, installs)
+	if err != nil {
+		return nil, err
 	}
-	// The project's PHP folder leads every task's PATH: whatever a task
-	// shells out to (composer, an npm script calling `php artisan`) then runs
-	// the project's PHP, not whichever one is first on the machine's PATH.
-	var pathPrepend []string
 	if phpPath != "" {
-		pathPrepend = []string{filepath.Dir(phpPath)}
+		fmt.Printf("project %s: php %s → %s\n", p.ID, p.PHP, phpPath)
 	}
+	pathPrepend := PHPPath(phpPath)
 	vars := config.Vars{PHP: phpPath, Host: host, Port: port}
 
 	var specs []SpecEntry
@@ -186,6 +165,42 @@ func (d *Daemon) BuildAllSpecs(p config.Project, installs []discover.Install, ta
 		})
 	}
 	return specs, nil
+}
+
+// ProjectPHP resolves the project's PHP binary. It returns "" when the
+// project neither names a version nor references {php}, so a node-only
+// project does not require PHP at all.
+func ProjectPHP(p config.Project, installs []discover.Install) (string, error) {
+	if p.PHP == "" {
+		if !projectUsesPHP(p) {
+			return "", nil
+		}
+		vers := make([]string, len(installs))
+		for i, in := range installs {
+			vers[i] = in.Version
+		}
+		found := strings.Join(vers, ", ")
+		if found == "" {
+			found = "none — check php_roots"
+		}
+		return "", fmt.Errorf("project %s: tasks use {php} but no `php` version is set (installed: %s)", p.ID, found)
+	}
+	in, err := discover.Resolve(installs, p.PHP)
+	if err != nil {
+		return "", fmt.Errorf("project %s: %w", p.ID, err)
+	}
+	return in.Path, nil
+}
+
+// PHPPath returns the folders put in front of PATH for a project whose PHP
+// binary is phpPath: whatever a command shells out to (composer, an npm
+// script calling `php artisan`) then runs the project's PHP, not whichever
+// one is first on the machine's PATH. No PHP, no folders.
+func PHPPath(phpPath string) []string {
+	if phpPath == "" {
+		return nil
+	}
+	return []string{filepath.Dir(phpPath)}
 }
 
 // projectUsesPHP reports whether ANY task references {php} in its argv or

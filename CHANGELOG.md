@@ -9,6 +9,11 @@ Notable, user-facing changes. Newest first.
   script calling `php artisan`) picked up whichever PHP was first on the
   machine's `PATH`. Every task of a project with a `php` version now runs with
   that version's folder first on `PATH`.
+- **New: `ringmaster run <project> <command>`.** Runs a one-off command in the
+  project folder on the project's PHP, without remembering which `php.exe`
+  that is: `ringmaster run shop php artisan migrate`,
+  `ringmaster run shop composer install`. It exits with the command's exit
+  code.
 - **New: `env` and `cwd` on tasks.** `env` sets environment variables for one
   task and may use `{php}`, `{host}` and `{port}`; `cwd` runs a task in a
   subfolder of the project.
