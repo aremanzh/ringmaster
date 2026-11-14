@@ -61,7 +61,12 @@ func TestHelperProcess(t *testing.T) {
 	}
 	code, _ := strconv.Atoi(args[1])
 	fmt.Println("helper started")
+	wd, _ := os.Getwd()
+	fmt.Println("helper cwd=" + wd)
+	fmt.Println("helper value=" + os.Getenv("RINGMASTER_TEST_VALUE"))
+	fmt.Println("helper path0=" + filepath.SplitList(os.Getenv("PATH"))[0])
 	time.Sleep(sleep)
+	fmt.Fprintln(os.Stderr, "helper last line")
 	os.Exit(code)
 }
 

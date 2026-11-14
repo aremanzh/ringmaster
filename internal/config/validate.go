@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strings"
 )
 
 // validRestart lists accepted restart policies. An empty string is treated
@@ -89,8 +91,8 @@ func validateTasks(p Project) error {
 		seenTask[t.ID] = true
 
 		if t.External {
-			if len(t.Argv) != 0 || t.Primary || t.Restart != "" || t.Ready != nil || t.RequiresDocker || len(t.Cleanup) != 0 {
-				return fmt.Errorf("config: project %q: task %q: external tasks take no argv/primary/restart/ready/requires_docker/cleanup", p.ID, t.ID)
+			if len(t.Argv) != 0 || t.Primary || t.Restart != "" || t.Ready != nil || t.RequiresDocker || len(t.Cleanup) != 0 || t.Cwd != "" || len(t.Env) != 0 {
+				return fmt.Errorf("config: project %q: task %q: external tasks take no argv/primary/restart/ready/requires_docker/cleanup/cwd/env", p.ID, t.ID)
 			}
 			if t.Port != 0 && (t.Port < 1 || t.Port > 65535) {
 				return fmt.Errorf("config: project %q: task %q: port %d out of range", p.ID, t.ID, t.Port)
@@ -119,6 +121,13 @@ func validateTasks(p Project) error {
 			}
 		}
 
+		if t.Cwd != "" && !filepath.IsLocal(t.Cwd) {
+			return fmt.Errorf("config: project %q: task %q: cwd %q must be relative to the project and stay inside it", p.ID, t.ID, t.Cwd)
+		}
+		if err := validateEnv(t.Env); err != nil {
+			return fmt.Errorf("config: project %q: task %q: %w", p.ID, t.ID, err)
+		}
+
 		if t.Primary {
 			primaries++
 		}
@@ -136,6 +145,28 @@ func validateTasks(p Project) error {
 	}
 	if primaries > 1 {
 		return fmt.Errorf("config: project %q: more than one task marked primary", p.ID)
+	}
+	return nil
+}
+
+// validateEnv checks a task's env block: usable variable names, and only
+// known placeholders in the values.
+func validateEnv(env map[string]string) error {
+	names := make([]string, 0, len(env))
+	for name := range env {
+		names = append(names, name)
+	}
+	sort.Strings(names) // report the same variable first on every run
+	for _, name := range names {
+		if name == "" || strings.ContainsAny(name, "=\x00") || strings.TrimSpace(name) != name {
+			return fmt.Errorf("env: %q is not a usable variable name", name)
+		}
+		if strings.Contains(env[name], "\x00") {
+			return fmt.Errorf("env: value of %s contains a NUL byte", name)
+		}
+		if err := checkPlaceholders(env[name]); err != nil {
+			return fmt.Errorf("env %s: %w", name, err)
+		}
 	}
 	return nil
 }

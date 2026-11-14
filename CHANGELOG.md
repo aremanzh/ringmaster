@@ -2,6 +2,28 @@
 
 Notable, user-facing changes. Newest first.
 
+## Unreleased
+
+- **The project's PHP is now on `PATH` for every task.** `{php}` already ran
+  the right `php.exe`, but anything a task started in turn (`composer`, an npm
+  script calling `php artisan`) picked up whichever PHP was first on the
+  machine's `PATH`. Every task of a project with a `php` version now runs with
+  that version's folder first on `PATH`.
+- **New: `ringmaster run <project> <command>`.** Runs a one-off command in the
+  project folder on the project's PHP, without remembering which `php.exe`
+  that is: `ringmaster run shop php artisan migrate`,
+  `ringmaster run shop composer install`. It exits with the command's exit
+  code.
+- **New: `env` and `cwd` on tasks.** `env` sets environment variables for one
+  task and may use `{php}`, `{host}` and `{port}`; `cwd` runs a task in a
+  subfolder of the project.
+- Changed: a project whose `php` version is not installed now shows an error
+  even if none of its tasks uses `{php}`.
+- **Fixed: a task that exited right away had an empty log.** Whatever a
+  process printed just before exiting was thrown away, so a task that crashed
+  on startup (a missing `artisan`, a syntax error) showed as `failed` with no
+  reason. Every line is now kept, and the exit status is logged after it.
+
 ## 0.1.3 — 2026-11-14
 
 - **Security: other web pages can no longer drive the API.** While

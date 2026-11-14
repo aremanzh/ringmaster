@@ -110,37 +110,35 @@ func (d *Daemon) BuildAllSpecs(p config.Project, installs []discover.Install, ta
 		}
 	}
 
-	// Resolve PHP only if some task actually references {php}, so a node-only
-	// project does not require PHP at all.
-	phpPath := ""
-	if projectUsesPHP(p) {
-		if p.PHP == "" {
-			vers := make([]string, len(installs))
-			for i, in := range installs {
-				vers[i] = in.Version
-			}
-			found := strings.Join(vers, ", ")
-			if found == "" {
-				found = "none — check php_roots"
-			}
-			return nil, fmt.Errorf("project %s: tasks use {php} but no `php` version is set (installed: %s)", p.ID, found)
-		}
-		in, err := discover.Resolve(installs, p.PHP)
-		if err != nil {
-			return nil, fmt.Errorf("project %s: %w", p.ID, err)
-		}
-		phpPath = in.Path
-		fmt.Printf("project %s: php %s → %s\n", p.ID, p.PHP, in.Path)
+	phpPath, err := ProjectPHP(p, installs)
+	if err != nil {
+		return nil, err
 	}
+	if phpPath != "" {
+		fmt.Printf("project %s: php %s → %s\n", p.ID, p.PHP, phpPath)
+	}
+	pathPrepend := PHPPath(phpPath)
+	vars := config.Vars{PHP: phpPath, Host: host, Port: port}
 
 	var specs []SpecEntry
 	for _, t := range p.Tasks {
 		if t.External {
 			continue // observed, never spawned
 		}
-		argv, err := config.Interpolate(t.Argv, config.Vars{PHP: phpPath, Host: host, Port: port})
+		argv, err := config.Interpolate(t.Argv, vars)
 		if err != nil {
 			return nil, fmt.Errorf("project %s task %s: %w", p.ID, t.ID, err)
+		}
+		env, err := interpolateEnv(t.Env, vars)
+		if err != nil {
+			return nil, fmt.Errorf("project %s task %s: %w", p.ID, t.ID, err)
+		}
+		dir := p.Path
+		if t.Cwd != "" {
+			dir = filepath.Join(p.Path, t.Cwd)
+			if fi, err := os.Stat(dir); err != nil || !fi.IsDir() {
+				return nil, fmt.Errorf("project %s task %s: cwd %q does not exist in %s", p.ID, t.ID, t.Cwd, p.Path)
+			}
 		}
 		// Only tasks that actually own the project port carry it: the port
 		// precheck (primary) and the port readiness probe use it. Leaving it
@@ -156,7 +154,8 @@ func (d *Daemon) BuildAllSpecs(p config.Project, installs []discover.Install, ta
 		}
 		specs = append(specs, SpecEntry{
 			Spec: supervisor.TaskSpec{
-				Key: p.ID + ":" + t.ID, Dir: p.Path, Argv: argv,
+				Key: p.ID + ":" + t.ID, Dir: dir, Argv: argv,
+				Env: env, PathPrepend: pathPrepend,
 				Host: host, Port: specPort, Primary: t.Primary,
 				Ready: t.Ready, Restart: t.Restart,
 				RequiresDocker: t.RequiresDocker,
@@ -168,8 +167,45 @@ func (d *Daemon) BuildAllSpecs(p config.Project, installs []discover.Install, ta
 	return specs, nil
 }
 
-// projectUsesPHP reports whether ANY task references {php}: even non-autostart
-// tasks can be launched later via the API, so all tasks count.
+// ProjectPHP resolves the project's PHP binary. It returns "" when the
+// project neither names a version nor references {php}, so a node-only
+// project does not require PHP at all.
+func ProjectPHP(p config.Project, installs []discover.Install) (string, error) {
+	if p.PHP == "" {
+		if !projectUsesPHP(p) {
+			return "", nil
+		}
+		vers := make([]string, len(installs))
+		for i, in := range installs {
+			vers[i] = in.Version
+		}
+		found := strings.Join(vers, ", ")
+		if found == "" {
+			found = "none — check php_roots"
+		}
+		return "", fmt.Errorf("project %s: tasks use {php} but no `php` version is set (installed: %s)", p.ID, found)
+	}
+	in, err := discover.Resolve(installs, p.PHP)
+	if err != nil {
+		return "", fmt.Errorf("project %s: %w", p.ID, err)
+	}
+	return in.Path, nil
+}
+
+// PHPPath returns the folders put in front of PATH for a project whose PHP
+// binary is phpPath: whatever a command shells out to (composer, an npm
+// script calling `php artisan`) then runs the project's PHP, not whichever
+// one is first on the machine's PATH. No PHP, no folders.
+func PHPPath(phpPath string) []string {
+	if phpPath == "" {
+		return nil
+	}
+	return []string{filepath.Dir(phpPath)}
+}
+
+// projectUsesPHP reports whether ANY task references {php} in its argv or
+// env: even non-autostart tasks can be launched later via the API, so all
+// tasks count.
 func projectUsesPHP(p config.Project) bool {
 	for _, t := range p.Tasks {
 		for _, arg := range t.Argv {
@@ -177,8 +213,29 @@ func projectUsesPHP(p config.Project) bool {
 				return true
 			}
 		}
+		for _, v := range t.Env {
+			if strings.Contains(v, "{php}") {
+				return true
+			}
+		}
 	}
 	return false
+}
+
+// interpolateEnv resolves the placeholders in a task's env values.
+func interpolateEnv(env map[string]string, vars config.Vars) (map[string]string, error) {
+	if len(env) == 0 {
+		return nil, nil
+	}
+	out := make(map[string]string, len(env))
+	for name, value := range env {
+		resolved, err := config.Interpolate([]string{value}, vars)
+		if err != nil {
+			return nil, fmt.Errorf("env %s: %w", name, err)
+		}
+		out[name] = resolved[0]
+	}
+	return out, nil
 }
 
 // MirrorLogs streams a task's ring buffer into its log file so `ringmaster logs` can

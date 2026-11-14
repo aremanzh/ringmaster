@@ -39,6 +39,10 @@ const (
 	portReadyTimeout   = 30 * time.Second
 	stdoutReadyTimeout = 60 * time.Second
 	stopGrace          = 3 * time.Second
+	// outputDrain bounds how long an exited task's status waits for the rest
+	// of its output. A grandchild that outlived the process can keep the
+	// pipes open, and the status must not wait on that.
+	outputDrain = 1 * time.Second
 	// maxConsecutiveFailures caps the restart loop so a task that crashes
 	// right after every start cannot restart forever.
 	maxConsecutiveFailures = 5
@@ -64,14 +68,21 @@ var (
 // TaskSpec is everything the supervisor needs to run one task. Argv must
 // already be interpolated (no {php}/{host}/{port} placeholders left).
 type TaskSpec struct {
-	Key     string // "<projectId>:<taskId>"
-	Dir     string // working directory (the project path)
-	Argv    []string
-	Host    string
-	Port    int
-	Primary bool
-	Ready   *config.Ready
-	Restart string // "", "no", RestartOnFailure or RestartAlways
+	Key  string // "<projectId>:<taskId>"
+	Dir  string // working directory (the project path, or the task's cwd in it)
+	Argv []string
+	// Env holds the task's own environment variables, applied on top of this
+	// process's environment. Values are already interpolated.
+	Env map[string]string
+	// PathPrepend lists directories put in front of the task's PATH (the
+	// project's PHP folder), so anything the task shells out to finds the
+	// same binaries. A bare argv[0] is looked up there first too.
+	PathPrepend []string
+	Host        string
+	Port        int
+	Primary     bool
+	Ready       *config.Ready
+	Restart     string // "", "no", RestartOnFailure or RestartAlways
 	// RequiresDocker runs a Docker-engine preflight before spawning.
 	RequiresDocker bool
 	// Cleanup holds absolute file paths removed before each spawn (leftovers
@@ -120,7 +131,8 @@ type task struct {
 	restarts  int
 	matched   chan struct{} // closed when the stdout ready pattern is seen
 	matchOnce *sync.Once
-	exited    chan struct{} // closed when the monitor goroutine finishes
+	pumps     sync.WaitGroup // the two output readers of this generation
+	exited    chan struct{}  // closed when the monitor goroutine finishes
 }
 
 // newTask builds the bookkeeping for one process generation.
@@ -212,24 +224,39 @@ func (s *Supervisor) Start(spec TaskSpec) error {
 // spawn builds and starts the process for t, wires log pumps, persists the
 // state entry, and launches the readiness and monitor goroutines.
 func (s *Supervisor) spawn(t *task) error {
-	argv, err := wrapArgv(t.spec.Argv)
+	argv, err := wrapArgvIn(t.spec.Argv, t.spec.PathPrepend)
 	if err != nil {
 		return fmt.Errorf("supervisor: %s: %w", t.spec.Key, err)
 	}
 	t.cleanup()
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = t.spec.Dir
-	stdout, err := cmd.StdoutPipe()
+	cmd.Env = taskEnv(t.spec.Env, t.spec.PathPrepend)
+	// Plain OS pipes that this package reads to the end itself. With
+	// cmd.StdoutPipe, Wait closes the read side the moment the process
+	// exits, which threw away whatever a short-lived process had printed:
+	// a task that crashed on startup had an empty log.
+	stdout, stdoutW, err := os.Pipe()
 	if err != nil {
 		return fmt.Errorf("supervisor: %s: stdout pipe: %w", t.spec.Key, err)
 	}
-	stderr, err := cmd.StderrPipe()
+	stderr, stderrW, err := os.Pipe()
 	if err != nil {
+		stdout.Close()
+		stdoutW.Close()
 		return fmt.Errorf("supervisor: %s: stderr pipe: %w", t.spec.Key, err)
 	}
+	cmd.Stdout, cmd.Stderr = stdoutW, stderrW
 
 	group := proc.New()
-	if err := group.Start(cmd); err != nil {
+	err = group.Start(cmd)
+	// The child has its own copies of the write ends; ours must go, or the
+	// readers would never see end-of-file.
+	stdoutW.Close()
+	stderrW.Close()
+	if err != nil {
+		stdout.Close()
+		stderr.Close()
 		return fmt.Errorf("supervisor: %s: %w", t.spec.Key, err)
 	}
 
@@ -254,6 +281,7 @@ func (s *Supervisor) spawn(t *task) error {
 		})
 	}
 
+	t.pumps.Add(2)
 	go t.pump("out", stdout)
 	go t.pump("err", stderr)
 	if t.spec.Ready != nil {
@@ -266,7 +294,12 @@ func (s *Supervisor) spawn(t *task) error {
 // pump copies one output stream into the ring buffer line by line. Windows
 // console output that is not UTF-8 is decoded from the active codepage
 // (decode_windows.go); Unix output passes through.
-func (t *task) pump(stream string, r io.Reader) {
+func (t *task) pump(stream string, r io.ReadCloser) {
+	defer t.pumps.Done()
+	defer r.Close()
+	// If the scanner gives up (a single line over its 1 MiB limit), keep
+	// reading and discard, so the task never blocks on a full pipe.
+	defer io.Copy(io.Discard, r)
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 64*1024), 1024*1024)
 	for sc.Scan() {
@@ -357,6 +390,14 @@ func waitPort(host string, port int, timeout time.Duration, dead <-chan struct{}
 // policy.
 func (s *Supervisor) monitor(t *task) {
 	<-t.group.Done()
+	// Let the last lines land in the log before the exit status is recorded
+	// after them.
+	drained := make(chan struct{})
+	go func() { t.pumps.Wait(); close(drained) }()
+	select {
+	case <-drained:
+	case <-time.After(outputDrain):
+	}
 	_ = s.state.Remove(t.spec.Key)
 	t.cleanup()
 
@@ -600,7 +641,12 @@ func (s *Supervisor) ReapOrphans() ([]ReapResult, error) {
 // shell:false. The rewrite never exposes cmd.exe semantics to the config:
 // arguments stay an array end to end.
 func wrapArgv(argv []string) ([]string, error) {
-	exe, err := exec.LookPath(argv[0])
+	return wrapArgvIn(argv, nil)
+}
+
+// wrapArgvIn is wrapArgv with dirs searched before PATH for a bare argv[0].
+func wrapArgvIn(argv []string, dirs []string) ([]string, error) {
+	exe, err := resolveExe(argv[0], dirs)
 	if err != nil {
 		return nil, fmt.Errorf("resolve %q: %w", argv[0], err)
 	}

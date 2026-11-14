@@ -27,6 +27,11 @@ var version = "dev"
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
+		// `ringmaster run` passes its command's exit code through untouched.
+		var code exitCode
+		if errors.As(err, &code) {
+			os.Exit(int(code))
+		}
 		fmt.Fprintln(os.Stderr, "ringmaster:", err)
 		os.Exit(1)
 	}
@@ -77,6 +82,8 @@ func run(args []string) error {
 		return app.ps()
 	case "logs":
 		return app.logs(rest)
+	case "run":
+		return app.runCommand(rest, os.Stdin, os.Stdout, os.Stderr)
 	default:
 		usage()
 		return fmt.Errorf("unknown subcommand %q", cmd)
@@ -97,6 +104,8 @@ Commands:
   restart <projectId>         down then up
   ps                          show recorded tasks and their live status
   logs <projectId>[:<taskId>] print buffered logs and tail live
+  run <projectId> [--] <cmd>  run a one-off command in the project folder with its PHP
+                              first on PATH, e.g. ringmaster run shop php artisan migrate
 `)
 }
 

@@ -12,12 +12,13 @@ var placeholderPattern = regexp.MustCompile(`\{([a-z_]+)\}`)
 // knownPlaceholders are the tokens supported inside argv strings.
 var knownPlaceholders = map[string]bool{"php": true, "host": true, "port": true}
 
-// checkPlaceholders rejects argv strings referencing unknown tokens, so a
-// typo like {prot} fails at load time instead of spawning a broken command.
+// checkPlaceholders rejects argv strings and env values referencing unknown
+// tokens, so a typo like {prot} fails at load time instead of spawning a
+// broken command.
 func checkPlaceholders(arg string) error {
 	for _, m := range placeholderPattern.FindAllStringSubmatch(arg, -1) {
 		if !knownPlaceholders[m[1]] {
-			return fmt.Errorf("unknown placeholder {%s} in argv element %q", m[1], arg)
+			return fmt.Errorf("unknown placeholder {%s} in %q", m[1], arg)
 		}
 	}
 	return nil

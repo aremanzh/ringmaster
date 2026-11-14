@@ -298,3 +298,62 @@ projects:
 		t.Fatal("external task with argv must be rejected")
 	}
 }
+
+// TestTaskCwdAndEnv: both parse, and the bad spellings are rejected.
+func TestTaskCwdAndEnv(t *testing.T) {
+	task := func(extra string) string {
+		return validYAML + `
+  - id: "mono"
+    path: "C:\\x"
+    tasks:
+      - id: "web"
+        argv: ["npm.cmd", "run", "dev"]
+` + extra
+	}
+
+	cfg, err := Parse([]byte(task(`        cwd: "frontend"
+        env:
+          APP_URL: "http://{host}:{port}"
+          PHP_BINARY: "{php}"
+          NODE_ENV: development
+`)))
+	if err != nil {
+		t.Fatalf("valid cwd/env rejected: %v", err)
+	}
+	web := cfg.Projects[len(cfg.Projects)-1].Tasks[0]
+	if web.Cwd != "frontend" || len(web.Env) != 3 || web.Env["APP_URL"] != "http://{host}:{port}" {
+		t.Fatalf("parsed task = %+v", web)
+	}
+
+	bad := []struct {
+		name, extra, wantErr string
+	}{
+		{"cwd climbs out", `        cwd: "../other"` + "\n", "cwd"},
+		{"cwd is absolute", `        cwd: "/srv/app"` + "\n", "cwd"},
+		{"unknown placeholder in env", "        env:\n          APP_URL: \"http://{hots}\"\n", "unknown placeholder {hots}"},
+		{"env name with equals sign", "        env:\n          \"A=B\": x\n", "not a usable variable name"},
+		{"empty env name", "        env:\n          \"\": x\n", "not a usable variable name"},
+	}
+	for _, tt := range bad {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Parse([]byte(task(tt.extra)))
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("want error containing %q, got %v", tt.wantErr, err)
+			}
+		})
+	}
+
+	external := validYAML + `
+  - id: "ext"
+    path: "C:\\x"
+    port: 9000
+    tasks:
+      - id: "apache"
+        external: true
+        env:
+          A: b
+`
+	if _, err := Parse([]byte(external)); err == nil || !strings.Contains(err.Error(), "external tasks take no") {
+		t.Fatalf("external task with env: got %v", err)
+	}
+}

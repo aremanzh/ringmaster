@@ -40,6 +40,18 @@ projects:
                                      # non-zero exit. Gives up after 5 failed
                                      # restarts in a row.
 
+# --- more task options ---
+# Every task of a project with a `php` version runs with that PHP's folder
+# first on PATH, so `php` inside composer or an npm script is the project's.
+#
+# A task in a subfolder, with its own environment variables. cwd is relative to
+# the project path; env values may use {php}, {host} and {port}:
+#   - id: frontend
+#     cwd: "frontend"
+#     argv: ["npm.cmd", "run", "dev"]
+#     env:
+#       VITE_API_URL: "http://{host}:{port}"
+#
 # --- M3 examples ---
 # An externally-managed service ringmaster only observes (status = port probe):
 #   - id: apache

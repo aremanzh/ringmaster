@@ -34,6 +34,10 @@ type TaskSpec struct {
 	// drop it from ringmaster.yaml.
 	RequiresDocker bool     `json:"requires_docker"`
 	Cleanup        []string `json:"cleanup,omitempty"`
+	// Cwd and Env have no editor fields yet; they are carried through for the
+	// same reason.
+	Cwd string            `json:"cwd,omitempty"`
+	Env map[string]string `json:"env,omitempty"`
 }
 
 // ReadySpec mirrors config.Ready in the request body.
@@ -50,7 +54,7 @@ func (spec ProjectSpec) toProject(id string) config.Project {
 	}
 	p := config.Project{ID: id, Label: spec.Label, Path: spec.Path, PHP: spec.PHP, Port: spec.Port}
 	for _, t := range spec.Tasks {
-		task := config.Task{ID: t.ID, Argv: t.Argv, Primary: t.Primary, Autostart: t.Autostart, Restart: t.Restart, External: t.External, Port: t.Port, RequiresDocker: t.RequiresDocker, Cleanup: t.Cleanup}
+		task := config.Task{ID: t.ID, Argv: t.Argv, Primary: t.Primary, Autostart: t.Autostart, Restart: t.Restart, External: t.External, Port: t.Port, RequiresDocker: t.RequiresDocker, Cleanup: t.Cleanup, Cwd: t.Cwd, Env: t.Env}
 		if t.Ready != nil {
 			task.Ready = &config.Ready{Type: t.Ready.Type, Match: t.Ready.Match}
 		}
@@ -63,7 +67,7 @@ func (spec ProjectSpec) toProject(id string) config.Project {
 func specFromProject(p config.Project) ProjectSpec {
 	spec := ProjectSpec{ID: p.ID, Label: p.Label, Path: p.Path, PHP: p.PHP, Port: p.Port, Tasks: []TaskSpec{}}
 	for _, t := range p.Tasks {
-		ts := TaskSpec{ID: t.ID, Argv: t.Argv, Primary: t.Primary, Autostart: t.Autostart, Restart: t.Restart, External: t.External, Port: t.Port, RequiresDocker: t.RequiresDocker, Cleanup: t.Cleanup}
+		ts := TaskSpec{ID: t.ID, Argv: t.Argv, Primary: t.Primary, Autostart: t.Autostart, Restart: t.Restart, External: t.External, Port: t.Port, RequiresDocker: t.RequiresDocker, Cleanup: t.Cleanup, Cwd: t.Cwd, Env: t.Env}
 		if ts.Argv == nil {
 			ts.Argv = []string{}
 		}
