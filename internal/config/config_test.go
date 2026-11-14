@@ -1,6 +1,7 @@
 package config
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -77,34 +78,6 @@ func TestValidateErrors(t *testing.T) {
 			name:    "missing version",
 			mutate:  func(s string) string { return strings.Replace(s, "version: 1", "", 1) },
 			wantErr: `missing "version: 1"`,
-		},
-		{
-			name: "cleanup escapes the project",
-			mutate: func(s string) string {
-				return s + `
-  - id: "esc"
-    path: "C:\\x"
-    tasks:
-      - id: "vite"
-        argv: ["cmd"]
-        cleanup: ["..\\other\\public\\hot"]
-`
-			},
-			wantErr: "cleanup path",
-		},
-		{
-			name: "cleanup is absolute",
-			mutate: func(s string) string {
-				return s + `
-  - id: "abs"
-    path: "C:\\x"
-    tasks:
-      - id: "vite"
-        argv: ["cmd"]
-        cleanup: ["C:\\Windows\\win.ini"]
-`
-			},
-			wantErr: "cleanup path",
 		},
 		{
 			name: "duplicate project id",
@@ -193,6 +166,42 @@ func TestValidateErrors(t *testing.T) {
 				t.Fatalf("want error containing %q, got %q", tt.wantErr, err)
 			}
 		})
+	}
+}
+
+// TestCleanupMustStayInsideProject: cleanup deletes files, so a path that
+// climbs out of the project or is absolute is a validation error.
+func TestCleanupMustStayInsideProject(t *testing.T) {
+	bad := []string{"../other/public/hot", "public/../../hot", "/etc/hosts"}
+	if runtime.GOOS == "windows" {
+		bad = append(bad, `..\other\public\hot`, `C:\Windows\win.ini`, `\Windows\win.ini`)
+	}
+	for _, path := range bad {
+		// Single-quoted YAML keeps backslashes literal.
+		yml := validYAML + `
+  - id: "esc"
+    path: "C:\\x"
+    tasks:
+      - id: "vite"
+        argv: ["cmd"]
+        cleanup: ['` + path + `']
+`
+		_, err := Parse([]byte(yml))
+		if err == nil || !strings.Contains(err.Error(), "cleanup path") {
+			t.Errorf("cleanup %q: want a \"cleanup path\" error, got %v", path, err)
+		}
+	}
+
+	ok := validYAML + `
+  - id: "fine"
+    path: "C:\\x"
+    tasks:
+      - id: "vite"
+        argv: ["cmd"]
+        cleanup: ["public/hot", "storage/framework/down"]
+`
+	if _, err := Parse([]byte(ok)); err != nil {
+		t.Errorf("cleanup inside the project rejected: %v", err)
 	}
 }
 

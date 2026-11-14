@@ -1,0 +1,60 @@
+name: ci
+
+# Tag pushes are not listed here: release.yml tests and builds those.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  test:
+    # A pull request from a branch of this repository already ran on push;
+    # only pull requests from forks need the pull_request run.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            test_flags: ""
+          - os: ubuntu-latest
+            test_flags: "-race"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # Linux only: a Windows checkout may convert line endings.
+      - name: Format
+        if: runner.os == 'Linux'
+        run: |
+          unformatted="$(gofmt -l .)"
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed on:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ${{ matrix.test_flags }} ./...
+
+      - name: Build CLI
+        run: go build -o dist/ ./cmd/ringmaster
+
+      # The desktop app only builds with its tags, so nothing above compiles it.
+      - name: Build desktop app
+        if: runner.os == 'Windows'
+        run: go build -tags gui,desktop,production -ldflags "-H windowsgui" -o dist/ringmaster-gui.exe ./cmd/ringmaster-gui

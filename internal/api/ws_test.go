@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -17,9 +18,13 @@ import (
 // TestEventsWSStreamsStatusTransitions starts a real short-lived process and
 // expects its transitions on /api/events.
 func TestEventsWSStreamsStatusTransitions(t *testing.T) {
+	argv := []string{"sh", "-c", "echo hi"}
+	if runtime.GOOS == "windows" {
+		argv = []string{"cmd.exe", "/c", "echo hi"}
+	}
 	cfg := &config.Config{Projects: []config.Project{{
 		ID: "demo", Path: t.TempDir(),
-		Tasks: []config.Task{{ID: "echo", Argv: []string{"cmd.exe", "/c", "echo hi"}}},
+		Tasks: []config.Task{{ID: "echo", Argv: argv}},
 	}}}
 	sup := supervisor.New(filepath.Join(t.TempDir(), "state.json"))
 	spec := supervisor.TaskSpec{Key: "demo:echo", Dir: cfg.Projects[0].Path, Argv: cfg.Projects[0].Tasks[0].Argv}

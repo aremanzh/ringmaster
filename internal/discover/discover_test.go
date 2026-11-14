@@ -87,7 +87,8 @@ func sign(n int) int {
 }
 
 // TestScanRoots builds a fake php_roots tree on disk and checks that only
-// version-carrying folders containing php.exe are picked up.
+// version-carrying folders containing the PHP binary (php.exe on Windows, php
+// elsewhere) are picked up.
 func TestScanRoots(t *testing.T) {
 	root := t.TempDir()
 	mk := func(dir string, withExe bool) {
@@ -96,14 +97,14 @@ func TestScanRoots(t *testing.T) {
 			t.Fatal(err)
 		}
 		if withExe {
-			if err := os.WriteFile(filepath.Join(full, "php.exe"), []byte("x"), 0o755); err != nil {
+			if err := os.WriteFile(filepath.Join(full, phpBinary()), []byte("x"), 0o755); err != nil {
 				t.Fatal(err)
 			}
 		}
 	}
 	mk("php-8.2.27-nts-Win32-vs16-x64", true)
 	mk("php-8.1.31", true)
-	mk("php-8.3.2-Win32-vs16-x64", false) // no php.exe → skipped
+	mk("php-8.3.2-Win32-vs16-x64", false) // no binary → skipped
 	mk("composer", true)                  // not a php-<ver> folder → skipped
 
 	installs, err := scanRoots([]string{root, filepath.Join(root, "does-not-exist")})
@@ -134,7 +135,7 @@ func TestDiscoverDeduplicates(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "php.exe"), []byte("x"), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, phpBinary()), []byte("x"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	// Same root listed twice must not produce duplicate installs.
@@ -144,7 +145,7 @@ func TestDiscoverDeduplicates(t *testing.T) {
 	}
 	count := 0
 	for _, in := range installs {
-		if strings.EqualFold(in.Path, filepath.Join(dir, "php.exe")) {
+		if strings.EqualFold(in.Path, filepath.Join(dir, phpBinary())) {
 			count++
 		}
 	}
