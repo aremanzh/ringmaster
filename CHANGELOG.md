@@ -2,7 +2,7 @@
 
 Notable, user-facing changes. Newest first.
 
-## Unreleased
+## 0.2.0 — 2026-11-14
 
 - **New: no YAML needed to get started.** `ringmaster serve` and the desktop
   app used to refuse to start without a `ringmaster.yaml` that already had a
