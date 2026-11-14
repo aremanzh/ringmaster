@@ -2,7 +2,7 @@
 
 Notable, user-facing changes. Newest first.
 
-## 0.1.3 — unreleased
+## 0.1.3 — 2026-11-14
 
 - **Security: other web pages can no longer drive the API.** While
   `ringmaster serve` was running, any page open in your browser could send
