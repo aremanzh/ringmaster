@@ -3,6 +3,7 @@ package daemon
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/aremanzh/ringmaster/internal/config"
@@ -30,11 +31,10 @@ func (r *Running) Stop() { r.d.shutdown(r.sup) }
 // specs for every task, start the autostart ones, and return a core.Engine
 // wired with the save/rebuild/discover callbacks. The caller chooses the
 // transport (HTTP for the CLI, Wails bindings for the GUI).
+//
+// A config without projects is fine: the dashboard comes up empty and the
+// first project is added from it.
 func (d *Daemon) Start() (*Running, error) {
-	if len(d.Cfg.Projects) == 0 {
-		return nil, fmt.Errorf("no projects in config")
-	}
-
 	// Same preflight as `up`: refuse to double-start, reap true orphans.
 	for _, p := range d.Cfg.Projects {
 		if err := d.ReapProject(p.ID, false); err != nil {
@@ -99,12 +99,21 @@ func (d *Daemon) Start() (*Running, error) {
 	eng := core.New(sup, d.Cfg, specs, core.Callbacks{
 		OnStart:    func(key string) { d.MirrorLogs(sup, key) },
 		SaveConfig: func(cfg *config.Config) error { return config.Save(d.CfgPath, cfg) },
+		ConfigPath: d.absCfgPath(),
 		Rebuild:    d.RebuildSpecs,
 		Discover:   d.discoverInstalls,
 	})
 	eng.SetProjectErrors(projErrs)
 	eng.SetStartErrors(startErrs)
 	return &Running{Engine: eng, sup: sup, d: d}, nil
+}
+
+// absCfgPath is the config file's absolute path, for showing to the user.
+func (d *Daemon) absCfgPath() string {
+	if abs, err := filepath.Abs(d.CfgPath); err == nil {
+		return abs
+	}
+	return d.CfgPath
 }
 
 // primaryFirst orders a project's spec entries with the primary task first,

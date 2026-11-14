@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/aremanzh/ringmaster/internal/config"
+	"github.com/aremanzh/ringmaster/internal/core"
 	"github.com/aremanzh/ringmaster/internal/discover"
 )
 
@@ -122,5 +123,52 @@ func TestSpecsResolveCwdAndEnv(t *testing.T) {
 	p.Tasks[1].Cwd = "missing"
 	if _, err = testDaemon(p).BuildAllSpecs(p, fakeInstalls(root), map[int]bool{}); err == nil || !strings.Contains(err.Error(), `cwd "missing" does not exist`) {
 		t.Errorf("missing cwd: got %v", err)
+	}
+}
+
+// TestStartEmptyThenAddFirstProject is the first run: no config file, the
+// daemon comes up with nothing, and adding a project from the UI creates
+// ringmaster.yaml in a folder that did not exist.
+func TestStartEmptyThenAddFirstProject(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "per-user", "Ringmaster")
+	cfgPath := filepath.Join(home, config.FileName)
+	cfg, existed, err := config.LoadOrEmpty(cfgPath)
+	if err != nil || existed {
+		t.Fatalf("LoadOrEmpty: existed %v, err %v", existed, err)
+	}
+	d := &Daemon{Cfg: cfg, CfgPath: cfgPath, StatePath: filepath.Join(home, "ringmaster.state.json")}
+
+	run, err := d.Start()
+	if err != nil {
+		t.Fatalf("Start with no projects: %v", err)
+	}
+	defer run.Stop()
+	if got := run.Engine.Status(); len(got) != 0 {
+		t.Fatalf("status = %+v, want no projects", got)
+	}
+	if got := run.Engine.ConfigPath(); got != cfgPath {
+		t.Errorf("ConfigPath = %q, want %q", got, cfgPath)
+	}
+	if _, err := os.Stat(cfgPath); !os.IsNotExist(err) {
+		t.Fatalf("config file exists before anything was added (err %v)", err)
+	}
+
+	project := t.TempDir()
+	err = run.Engine.AddProject(core.ProjectSpec{
+		ID: "first", Path: project, Port: 18500,
+		Tasks: []core.TaskSpec{{ID: "serve", Argv: []string{"node", "server.js"}, Primary: true}},
+	})
+	if err != nil {
+		t.Fatalf("AddProject: %v", err)
+	}
+	saved, err := config.Load(cfgPath)
+	if err != nil {
+		t.Fatalf("config after the first project: %v", err)
+	}
+	if len(saved.Projects) != 1 || saved.Projects[0].ID != "first" {
+		t.Fatalf("saved projects = %+v", saved.Projects)
+	}
+	if got := run.Engine.Status(); len(got) != 1 || got[0].Error != "" {
+		t.Fatalf("status after add = %+v", got)
 	}
 }

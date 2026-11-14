@@ -399,7 +399,8 @@ function renderMain() {
     head.innerHTML = `<span class="pname">Ringmaster</span><span class="sep">·</span>
       <span class="path">bring your own binaries</span>`;
     tasks.innerHTML = `<div class="empty"><strong>No projects yet</strong>
-      Click + in the sidebar to add your first project.</div>`;
+      Click + in the sidebar to add your first project.${state.config_path ? `
+      It is saved to <span class="mono">${esc(state.config_path)}</span>.` : ""}</div>`;
     if (editorMode !== "add") $("configpane").innerHTML = "";
     return;
   }
@@ -469,7 +470,7 @@ function renderEditor() {
   const adding = editorMode === "add";
   pane.innerHTML = `
     <div class="section-label">${adding ? "New project" : "Configuration"}
-      <span class="hint">ringmaster.yaml</span></div>
+      <span class="hint" title="${esc(state.config_path || "")}">ringmaster.yaml</span></div>
     ${adding ? `
     <div class="field"><label>id</label>
       <input class="input mono" id="ed-id" value="${esc(d.id)}" placeholder="myapp" pattern="[a-z0-9][a-z0-9_-]*"></div>` : ""}
@@ -548,19 +549,26 @@ function edTask(i, field, value) {
   else t[field] = value;
 }
 
+// The three functions below redraw the whole form from editorDraft, so they
+// first copy what is typed in the project fields into the draft; without that
+// a redraw wiped the id, path, PHP version and port the user had entered.
 function edAddTask() {
+  readProjectFields();
   editorDraft.tasks.push({ id: "", argv: [] });
   renderEditor();
 }
 
 function edRmTask(i) {
+  readProjectFields();
   editorDraft.tasks.splice(i, 1);
   renderEditor();
 }
 
 function applyPreset(preset) {
+  readProjectFields();
   editorDraft.tasks = presetTasks(preset, "");
   renderEditor();
+  if ($("ed-preset")) $("ed-preset").value = preset;
 }
 
 function presetTasks(preset, command) {
@@ -578,13 +586,20 @@ function presetTasks(preset, command) {
   return [{ id: "run", primary: true, argv }];
 }
 
-function collectEditor() {
+// readProjectFields copies the project-level inputs into editorDraft.
+function readProjectFields() {
   const d = editorDraft;
+  if (!d || !$("ed-path")) return d;
   d.label = $("ed-label").value.trim();
   d.path = $("ed-path").value.trim();
   d.php = $("ed-php").value.trim();
   d.port = $("ed-port").value ? Number($("ed-port").value) : 0;
-  if (editorMode === "add") d.id = $("ed-id").value.trim();
+  if (editorMode === "add" && $("ed-id")) d.id = $("ed-id").value.trim();
+  return d;
+}
+
+function collectEditor() {
+  const d = readProjectFields();
   // normalize autostart: null → omit (defaults true)
   d.tasks.forEach(t => { if (t.autostart === null) delete t.autostart; });
   return d;

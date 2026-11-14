@@ -39,7 +39,7 @@ func main() {
 
 func run(args []string) error {
 	fs := flag.NewFlagSet("ringmaster", flag.ContinueOnError)
-	configPath := fs.String("config", "ringmaster.yaml", "path to the ringmaster.yaml registry")
+	configFlag := fs.String("config", "", "path to ringmaster.yaml (default: the current folder, then next to ringmaster.exe, then the per-user config folder)")
 	showVersion := fs.Bool("version", false, "print the version and exit")
 	fs.Usage = usage
 	if err := fs.Parse(args); err != nil {
@@ -63,11 +63,26 @@ func run(args []string) error {
 		return nil
 	}
 
-	cfg, err := config.Load(*configPath)
+	configPath, err := config.ResolvePath(*configFlag)
 	if err != nil {
 		return err
 	}
-	app := &app{cfg: cfg, cfgPath: *configPath, statePath: filepath.Join(filepath.Dir(*configPath), "ringmaster.state.json")}
+	// A missing config is a normal first start for `serve`: it comes up empty
+	// and the file is created when the first project is added in the UI. The
+	// other commands accept a missing default config too, so `ps` and `down`
+	// still reach a daemon that has no project yet; a missing file named with
+	// -config is an error for them.
+	var cfg *config.Config
+	cfgExists := true
+	if cmd == "serve" || *configFlag == "" {
+		cfg, cfgExists, err = config.LoadOrEmpty(configPath)
+	} else {
+		cfg, err = config.Load(configPath)
+	}
+	if err != nil {
+		return err
+	}
+	app := &app{cfg: cfg, cfgPath: configPath, cfgExists: cfgExists, statePath: filepath.Join(filepath.Dir(configPath), "ringmaster.state.json")}
 
 	switch cmd {
 	case "up":
@@ -111,8 +126,11 @@ Commands:
 
 // app carries the loaded config and derived paths through subcommands.
 type app struct {
-	cfg       *config.Config
-	cfgPath   string
+	cfg     *config.Config
+	cfgPath string
+	// cfgExists is false when cfgPath has not been created yet and cfg is the
+	// empty config.
+	cfgExists bool
 	statePath string
 }
 
@@ -129,7 +147,19 @@ func (a *app) project(id string) (config.Project, error) {
 			return p, nil
 		}
 	}
+	if len(a.cfg.Projects) == 0 {
+		return config.Project{}, a.noProjects()
+	}
 	return config.Project{}, fmt.Errorf("unknown project %q (known: %s)", id, strings.Join(a.projectIDs(), ", "))
+}
+
+// noProjects is the error for a command that needs a project when the config
+// has none, saying where the config is and how to fill it.
+func (a *app) noProjects() error {
+	if !a.cfgExists {
+		return fmt.Errorf("no config yet at %s — start `ringmaster serve` and add a project in the web UI, or copy ringmaster.example.yaml there", a.cfgPath)
+	}
+	return fmt.Errorf("no projects in %s — add one in the web UI (`ringmaster serve`) or in that file", a.cfgPath)
 }
 
 func (a *app) projectIDs() []string {

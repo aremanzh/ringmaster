@@ -23,7 +23,7 @@ func (a *app) up(rest []string) error {
 		return err
 	}
 	if len(projects) == 0 {
-		return fmt.Errorf("no projects in config")
+		return a.noProjects()
 	}
 
 	// A running daemon owns the tasks: route the action to it.

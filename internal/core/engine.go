@@ -31,6 +31,9 @@ type Callbacks struct {
 	Rebuild func(cfg *config.Config) (map[string]supervisor.TaskSpec, error)
 	// Discover lists PHP roots' installs. Nil disables the PHP listing.
 	Discover func(roots []string) ([]PHPInstall, error)
+	// ConfigPath is where SaveConfig writes, shown in the UI so the user can
+	// find the file. May be empty.
+	ConfigPath string
 }
 
 // ProjectErrors maps a project ID to why its tasks could not be built (missing
@@ -112,6 +115,9 @@ func (e *Engine) startTask(spec supervisor.TaskSpec) error {
 	}
 	return err
 }
+
+// ConfigPath is the config file's location for display, or "".
+func (e *Engine) ConfigPath() string { return e.cb.ConfigPath }
 
 // CanEditConfig reports whether config-editing operations are wired.
 func (e *Engine) CanEditConfig() bool { return e.cb.SaveConfig != nil }

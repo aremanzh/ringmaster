@@ -53,6 +53,9 @@ func (a *App) pumpStatus() {
 
 func (a *App) Status() []core.ProjectView { return a.eng.Status() }
 
+// ConfigPath is where the config file lives, as GET /api/status reports it.
+func (a *App) ConfigPath() string { return a.eng.ConfigPath() }
+
 func (a *App) TaskAction(project, task, action string) error {
 	return a.eng.TaskAction(project, task, action)
 }

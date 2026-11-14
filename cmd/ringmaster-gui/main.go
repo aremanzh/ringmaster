@@ -39,20 +39,26 @@ func main() {
 
 func run(args []string) error {
 	fs := flag.NewFlagSet("ringmaster-gui", flag.ContinueOnError)
-	configPath := fs.String("config", "ringmaster.yaml", "path to the ringmaster.yaml registry")
+	configFlag := fs.String("config", "", "path to ringmaster.yaml (default: the current folder, then next to the app, then the per-user config folder)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
-	cfg, err := config.Load(*configPath)
+	// No config file yet is a normal first start: the window opens empty and
+	// the file is created when the first project is added.
+	configPath, err := config.ResolvePath(*configFlag)
+	if err != nil {
+		return err
+	}
+	cfg, _, err := config.LoadOrEmpty(configPath)
 	if err != nil {
 		return err
 	}
 
 	d := &daemon.Daemon{
 		Cfg:       cfg,
-		CfgPath:   *configPath,
-		StatePath: filepath.Join(filepath.Dir(*configPath), "ringmaster.state.json"),
+		CfgPath:   configPath,
+		StatePath: filepath.Join(filepath.Dir(configPath), "ringmaster.state.json"),
 	}
 	run, err := d.Start()
 	if err != nil {

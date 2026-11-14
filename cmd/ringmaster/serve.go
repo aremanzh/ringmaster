@@ -27,6 +27,9 @@ func (a *app) serve(rest []string) error {
 		return err
 	}
 
+	if !a.cfgExists {
+		fmt.Printf("no config yet: starting empty. Add a project in the web UI; it is saved to %s\n", a.cfgPath)
+	}
 	run, err := a.dmn().Start()
 	if err != nil {
 		return err

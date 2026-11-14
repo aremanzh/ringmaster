@@ -5,6 +5,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -117,6 +118,11 @@ func Save(path string, cfg *Config) error {
 	if err != nil {
 		return fmt.Errorf("config: marshal: %w", err)
 	}
+	// The first save may be into a folder that does not exist yet (the
+	// per-user config folder on a fresh install).
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("config: create folder for %s: %w", path, err)
+	}
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, data, 0o644); err != nil {
 		return fmt.Errorf("config: write %s: %w", tmp, err)
@@ -132,7 +138,7 @@ func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("config: %s not found — run: copy ringmaster.example.yaml ringmaster.yaml (then edit paths), or pass -config", path)
+			return nil, fmt.Errorf("config: %s not found — start `ringmaster serve` or the desktop app and add a project there, or copy ringmaster.example.yaml to that path", path)
 		}
 		return nil, fmt.Errorf("config: read %s: %w", path, err)
 	}

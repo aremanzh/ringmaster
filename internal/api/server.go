@@ -101,7 +101,7 @@ func (s *Server) Handler() http.Handler {
 
 // handleStatus merges the static config with the supervisor's live snapshot.
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"projects": s.eng.Status()})
+	writeJSON(w, http.StatusOK, map[string]any{"projects": s.eng.Status(), "config_path": s.eng.ConfigPath()})
 }
 
 // handleTaskAction starts, stops, or restarts one task.

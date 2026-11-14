@@ -4,6 +4,15 @@ Notable, user-facing changes. Newest first.
 
 ## Unreleased
 
+- **New: no YAML needed to get started.** `ringmaster serve` and the desktop
+  app used to refuse to start without a `ringmaster.yaml` that already had a
+  project in it. They now start empty; add your PHP folder and first project in
+  the UI, and the file is created for you in `%APPDATA%\Ringmaster`. An
+  existing `ringmaster.yaml` in the current folder still wins, so nothing
+  changes for current setups, and one next to `ringmaster.exe` is now found
+  too, whatever folder you start it from.
+- **Fixed: the add-project form forgot what you typed.** Choosing a template,
+  or adding or removing a task, cleared the id, path, PHP version and port.
 - **The project's PHP is now on `PATH` for every task.** `{php}` already ran
   the right `php.exe`, but anything a task started in turn (`composer`, an npm
   script calling `php artisan`) picked up whichever PHP was first on the

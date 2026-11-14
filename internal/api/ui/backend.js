@@ -41,7 +41,7 @@
     const seg = path.split("?")[0].split("/").filter(Boolean); // ["api", ...]
     const body = parseBody(opts);
     try {
-      if (path === "/api/status") return { projects: await A.Status() };
+      if (path === "/api/status") return { projects: await A.Status(), config_path: await A.ConfigPath() };
       if (path === "/api/php") return await A.PHP();
 
       if (seg[1] === "config" && seg[2] === "projects") {

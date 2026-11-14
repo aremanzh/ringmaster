@@ -34,10 +34,11 @@ Ringmaster does not install PHP, Node or databases, and it has no SSL, `*.test` 
 
 Download `ringmaster_<version>_windows_amd64.zip` from the [releases page](https://github.com/aremanzh/ringmaster/releases) and extract it. The zip holds `ringmaster.exe` (CLI and web UI), `ringmaster-gui.exe` (desktop app) and an example config.
 
-```powershell
-copy ringmaster.example.yaml ringmaster.yaml
-# edit ringmaster.yaml: php_roots, project path, php version, port
+Start `ringmaster-gui.exe`, or run `.\ringmaster.exe serve` and open http://127.0.0.1:9090. The first time there is no config, so Ringmaster starts empty: add the folder that holds your PHP versions under PHP, then click + to add a project (its folder, PHP version and the Laravel template). That creates `ringmaster.yaml` in your per-user config folder, `%APPDATA%\Ringmaster`; the empty screen shows the full path.
 
+To write the file by hand instead, copy `ringmaster.example.yaml` to `ringmaster.yaml` next to `ringmaster.exe` and edit `php_roots`, the project path, PHP version and port.
+
+```powershell
 .\ringmaster.exe serve             # start everything + web UI on http://127.0.0.1:9090
 .\ringmaster.exe up myapp          # or: start + supervise (foreground, Ctrl+C stops)
 .\ringmaster.exe ps                # recorded tasks with verified live status
@@ -95,7 +96,7 @@ See [`ringmaster.example.yaml`](ringmaster.example.yaml) for every option.
 | `ringmaster logs <projectId>[:<taskId>]` | Print the buffered log and tail live. Bare project id defaults to the primary task. |
 | `ringmaster run <projectId> [--] <command>` | Run a one-off command in the project folder with the project's PHP first on `PATH`: `ringmaster run shop php artisan migrate`, `ringmaster run shop composer install`, `ringmaster run shop php artisan tinker`. It runs in your terminal, is not supervised, works with or without the daemon, and exits with the command's exit code. |
 
-`-config path\to\ringmaster.yaml` selects a config; `ringmaster.state.json` and log files live next to it.
+Ringmaster uses the first config it finds: the file named with `-config path\to\ringmaster.yaml`, then `ringmaster.yaml` in the current folder, then one next to `ringmaster.exe`, then the per-user one (`%APPDATA%\Ringmaster\ringmaster.yaml`; `~/Library/Application Support/Ringmaster` on macOS, `~/.config/ringmaster` on Linux). `ringmaster.state.json` and the log files live next to the config in use.
 
 While `ringmaster serve` runs (found through `ringmaster.daemon.json`), `ps`, `up`, `down`, `restart` and `logs` go through the daemon, which gives richer statuses (`starting`, `failed`) and live log streaming. Bare `ringmaster down` shuts the whole daemon down; `ringmaster down <project>` stops only that project. Without a daemon, the CLI works from the state file.
 
