@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -109,7 +110,10 @@ func TestScanRootsLenientSkipsUnreadable(t *testing.T) {
 	if installs, err := scanRoots([]string{notADir}, "default", false); err != nil || len(installs) != 0 {
 		t.Errorf("lenient: got %v, %v", installs, err)
 	}
-	if _, err := scanRoots([]string{notADir}, "root", true); err == nil {
+	// Windows reports a file used as a folder as "path not found", which is
+	// the skipped case on purpose (a php_roots entry that is not there yet),
+	// so only the other platforms can tell it apart from a missing folder.
+	if _, err := scanRoots([]string{notADir}, "root", true); err == nil && runtime.GOOS != "windows" {
 		t.Error("strict: an unreadable php root was not reported")
 	}
 }
