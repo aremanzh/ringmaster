@@ -11,6 +11,12 @@ Notable, user-facing changes. Newest first.
   existing `ringmaster.yaml` in the current folder still wins, so nothing
   changes for current setups, and one next to `ringmaster.exe` is now found
   too, whatever folder you start it from.
+- **PHP from Herd, XAMPP, Scoop and Homebrew is found.** A PHP folder no
+  longer has to be named `php-<version>`: any folder with a `php.exe` in it is
+  asked for its version. With no `php_roots` configured, the default folders
+  of Laragon, XAMPP, Herd and Scoop (Homebrew on macOS) are searched as well,
+  so a fresh install usually finds PHP by itself. Setups that list `php_roots`
+  resolve exactly as before.
 - **Fixed: the add-project form forgot what you typed.** Choosing a template,
   or adding or removing a task, cleared the id, path, PHP version and port.
 - **The project's PHP is now on `PATH` for every task.** `{php}` already ran

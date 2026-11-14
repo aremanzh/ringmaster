@@ -3,7 +3,11 @@
 
 version: 1
 
-# Directories scanned for php-<version>* folders containing php.exe.
+# Folders that hold your PHP versions. A subfolder named php-<version>… is
+# read from its name; any other subfolder with a php.exe (Herd's php84,
+# Scoop's 8.3.1) and the folder itself (XAMPP's php) is asked with `php -v`.
+# Leave php_roots out and Ringmaster uses PHP on PATH plus the default
+# Laragon, XAMPP, Herd and Scoop folders.
 php_roots:
   - "C:\\laragon\\bin\\php"
 

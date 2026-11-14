@@ -107,7 +107,7 @@ func TestScanRoots(t *testing.T) {
 	mk("php-8.3.2-Win32-vs16-x64", false) // no binary → skipped
 	mk("composer", true)                  // not a php-<ver> folder → skipped
 
-	installs, err := scanRoots([]string{root, filepath.Join(root, "does-not-exist")})
+	installs, err := scanRoots([]string{root, filepath.Join(root, "does-not-exist")}, "root", true)
 	if err != nil {
 		t.Fatalf("scanRoots: %v", err)
 	}

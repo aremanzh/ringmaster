@@ -735,10 +735,10 @@ async function refreshPHP() {
     $("phproots").innerHTML = php.roots.map(r => `
       <div class="rowline"><span class="mono">${esc(r)}</span>
         <button class="btn danger" onclick="removeRoot('${esc(r).replace(/\\/g, "\\\\")}')">remove</button>
-      </div>`).join("") || `<div class="rowline" style="color:var(--faint)">no roots registered</div>`;
+      </div>`).join("") || `<div class="rowline" style="color:var(--faint)">no roots registered: using PHP on PATH and the default Laragon, XAMPP, Herd, Scoop and Homebrew folders</div>`;
     $("phpinstalls").innerHTML = php.installs.length
       ? php.installs.map(i => `<div class="rowline"><span class="badge">${esc(i.version)}</span><span class="mono">${esc(i.path)}</span></div>`).join("")
-      : `<div class="rowline" style="color:var(--faint)">no PHP installs discovered</div>`;
+      : `<div class="rowline" style="color:var(--faint)">no PHP installs discovered: add the folder that holds your PHP versions as a root</div>`;
   } catch { /* daemon without config hooks */ }
 }
 
