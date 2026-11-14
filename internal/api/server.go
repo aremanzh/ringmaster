@@ -16,9 +16,6 @@ import (
 
 // Hooks are the callbacks the daemon (`ringmaster serve`) wires into the server.
 type Hooks struct {
-	// OnStart is called after a task is started via the API (used to mirror
-	// its logs to file for the CLI `ringmaster logs` command). May be nil.
-	OnStart func(key string)
 	// OnShutdown is called when POST /api/shutdown is received (used by
 	// `ringmaster down` to stop the whole daemon). Nil disables the route.
 	OnShutdown func()
@@ -49,7 +46,6 @@ type Server struct {
 // The signature is unchanged for callers; internally it constructs the Engine.
 func New(sup *supervisor.Supervisor, cfg *config.Config, specs map[string]supervisor.TaskSpec, hooks Hooks) *Server {
 	eng := core.New(sup, cfg, specs, core.Callbacks{
-		OnStart:    hooks.OnStart,
 		SaveConfig: hooks.SaveConfig,
 		Rebuild:    hooks.Rebuild,
 		Discover:   hooks.Discover,

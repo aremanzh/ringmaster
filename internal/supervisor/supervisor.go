@@ -113,6 +113,7 @@ type Supervisor struct {
 	tasks  map[string]*task
 	state  *stateFile
 	events *eventHub
+	logDir string // "" = task logs are kept in memory only
 }
 
 type task struct {
@@ -189,14 +190,34 @@ func New(statePath string) *Supervisor {
 	return &Supervisor{tasks: map[string]*task{}, state: newStateFile(statePath), events: newEventHub()}
 }
 
+// LogTo makes every task also append its output to <dir>/<project>_<task>.log
+// (see LogFileName), so the log outlives this process and another process
+// can tail it. Call it before the first Start; dir must exist.
+func (s *Supervisor) LogTo(dir string) {
+	s.mu.Lock()
+	s.logDir = dir
+	s.mu.Unlock()
+}
+
+// Close releases the log files. Tasks are not touched; stop them first.
+func (s *Supervisor) Close() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, t := range s.tasks {
+		t.ring.closeFile()
+	}
+}
+
 // Start launches a task. For primary tasks the port is verified free first;
 // a busy port fails with the holding PID/image.
 func (s *Supervisor) Start(spec TaskSpec) error {
 	s.mu.Lock()
-	if t, ok := s.tasks[spec.Key]; ok && (t.status == StatusStarting || t.status == StatusRunning || t.status == StatusStopping) {
+	prev, known := s.tasks[spec.Key]
+	if known && (prev.status == StatusStarting || prev.status == StatusRunning || prev.status == StatusStopping) {
 		s.mu.Unlock()
-		return fmt.Errorf("supervisor: task %s is already %s", spec.Key, t.status)
+		return fmt.Errorf("supervisor: task %s is already %s", spec.Key, prev.status)
 	}
+	logDir := s.logDir
 	s.mu.Unlock()
 
 	if spec.RequiresDocker {
@@ -211,7 +232,20 @@ func (s *Supervisor) Start(spec TaskSpec) error {
 		}
 	}
 
-	t := newTask(spec, newRing())
+	// The log belongs to the task, not to one run of it: a task that is
+	// started again keeps writing to the same buffer and file, so what it
+	// printed before (the reason it was restarted, usually) is still there.
+	var log *ring
+	if known {
+		log = prev.ring
+		log.rotateIfLarge()
+	} else {
+		log = newRing()
+		if logDir != "" {
+			log.attachFile(filepath.Join(logDir, LogFileName(spec.Key)))
+		}
+	}
+	t := newTask(spec, log)
 	if err := s.spawn(t); err != nil {
 		return err
 	}
@@ -270,6 +304,8 @@ func (s *Supervisor) spawn(t *task) error {
 	}
 	status := t.status
 	s.mu.Unlock()
+	// Marks where each run begins in a log that now spans runs.
+	t.ring.Append("err", fmt.Sprintf("ringmaster: started (pid %d)", group.PID()))
 	s.emit(t.spec.Key, status, group.PID(), t.spec.Port)
 
 	// Persist identity for orphan reaping. Best-effort: a very short-lived
@@ -590,6 +626,7 @@ func (s *Supervisor) Forget(key string) error {
 	if t.status == StatusStarting || t.status == StatusRunning || t.status == StatusStopping {
 		return fmt.Errorf("supervisor: cannot forget %s while %s", key, t.status)
 	}
+	t.ring.closeFile()
 	delete(s.tasks, key)
 	return nil
 }

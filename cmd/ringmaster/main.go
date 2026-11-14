@@ -20,6 +20,7 @@ import (
 
 	"github.com/aremanzh/ringmaster/internal/config"
 	"github.com/aremanzh/ringmaster/internal/daemon"
+	"github.com/aremanzh/ringmaster/internal/supervisor"
 )
 
 // version is set at release build time with -ldflags "-X main.version=v1.2.3".
@@ -182,14 +183,14 @@ func (a *app) targets(rest []string) ([]config.Project, error) {
 	return []config.Project{p}, nil
 }
 
-// logDir is where the up process mirrors ring-buffer logs for `ringmaster logs`.
+// logDir is where each task's log file is kept.
 func (a *app) logDir() string {
-	return filepath.Join(filepath.Dir(a.statePath), ".ringmaster", "logs")
+	return a.dmn().LogDir()
 }
 
 // logPath maps a task key "proj:task" to its log file.
 func (a *app) logPath(key string) string {
-	return filepath.Join(a.logDir(), strings.ReplaceAll(key, ":", "_")+".log")
+	return filepath.Join(a.logDir(), supervisor.LogFileName(key))
 }
 
 // supervisorKey is the state-file key recording the up process itself.

@@ -51,6 +51,7 @@ func (d *Daemon) Start() (*Running, error) {
 	if err := os.MkdirAll(d.LogDir(), 0o755); err != nil {
 		return nil, fmt.Errorf("create log dir: %w", err)
 	}
+	sup.LogTo(d.LogDir())
 
 	// Build specs for EVERY task so the API can start non-autostart ones. A
 	// project that fails to build (missing path, no matching PHP) is recorded
@@ -90,14 +91,11 @@ func (d *Daemon) Start() (*Running, error) {
 				if s.Spec.Primary {
 					primaryFailed = true
 				}
-				continue
 			}
-			d.MirrorLogs(sup, s.Spec.Key)
 		}
 	}
 
 	eng := core.New(sup, d.Cfg, specs, core.Callbacks{
-		OnStart:    func(key string) { d.MirrorLogs(sup, key) },
 		SaveConfig: func(cfg *config.Config) error { return config.Save(d.CfgPath, cfg) },
 		ConfigPath: d.absCfgPath(),
 		Rebuild:    d.RebuildSpecs,
@@ -202,4 +200,5 @@ func (d *Daemon) shutdown(sup *supervisor.Supervisor) {
 	for _, p := range d.Cfg.Projects {
 		_ = supervisor.RemoveStateEntry(d.StatePath, SupervisorKey(p.ID))
 	}
+	sup.Close()
 }

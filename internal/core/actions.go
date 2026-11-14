@@ -208,12 +208,6 @@ func (e *Engine) refreshHost() {
 	e.projErrs = projErrs
 }
 
-func (e *Engine) onStart(key string) {
-	if e.cb.OnStart != nil {
-		e.cb.OnStart(key)
-	}
-}
-
 func (e *Engine) findProject(id string) (config.Project, bool) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()

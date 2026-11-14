@@ -143,3 +143,23 @@ func TestRunCommandErrors(t *testing.T) {
 		t.Fatalf("missing command: got %v, want a plain error", err)
 	}
 }
+
+func TestLastLines(t *testing.T) {
+	tests := []struct {
+		data string
+		n    int
+		want string
+	}{
+		{"a\nb\nc\n", 2, "b\nc\n"},
+		{"a\nb\nc", 2, "b\nc"},
+		{"a\nb\nc\n", 3, "a\nb\nc\n"},
+		{"a\nb\nc\n", 10, "a\nb\nc\n"},
+		{"only\n", 1, "only\n"},
+		{"", 5, ""},
+	}
+	for _, tt := range tests {
+		if got := string(lastLines([]byte(tt.data), tt.n)); got != tt.want {
+			t.Errorf("lastLines(%q, %d) = %q, want %q", tt.data, tt.n, got, tt.want)
+		}
+	}
+}

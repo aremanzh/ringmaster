@@ -16,12 +16,9 @@ import (
 )
 
 // Callbacks are the side effects the host (ringmaster serve, or the GUI) wires into
-// the Engine. Any of them may be nil; the Engine guards nil OnStart, and
-// CanEditConfig/CanDiscover report whether the config/PHP operations are wired.
+// the Engine. Any of them may be nil; CanEditConfig/CanDiscover report whether
+// the config/PHP operations are wired.
 type Callbacks struct {
-	// OnStart is called after a task starts (used to mirror its logs to file
-	// for the CLI `ringmaster logs`). May be nil.
-	OnStart func(key string)
 	// SaveConfig persists the already-validated config. Nil disables all
 	// config-editing operations.
 	SaveConfig func(cfg *config.Config) error
@@ -110,9 +107,6 @@ func (e *Engine) startTask(spec supervisor.TaskSpec) error {
 		delete(e.startErrs, spec.Key)
 	}
 	e.mu.Unlock()
-	if err == nil {
-		e.onStart(spec.Key)
-	}
 	return err
 }
 

@@ -17,6 +17,14 @@ Notable, user-facing changes. Newest first.
   of Laragon, XAMPP, Herd and Scoop (Homebrew on macOS) are searched as well,
   so a fresh install usually finds PHP by itself. Setups that list `php_roots`
   resolve exactly as before.
+- **Logs survive restarts.** Restarting a task used to clear its log, so the
+  output that explained why you restarted it was gone. The log pane now keeps
+  it and marks where each run starts. The log file next to the config is no
+  longer emptied on every start either: it is appended to, and moved to
+  `.log.1` once it passes 4 MB. `ringmaster logs` without a running daemon
+  prints the last 2000 lines of it.
+- Fixed: every task start left a background writer and an open file handle
+  behind until Ringmaster exited.
 - **Fixed: the add-project form forgot what you typed.** Choosing a template,
   or adding or removing a task, cleared the id, path, PHP version and port.
 - **The project's PHP is now on `PATH` for every task.** `{php}` already ran

@@ -25,14 +25,11 @@ type Daemon struct {
 	StatePath string
 }
 
-// LogDir is where a running supervisor mirrors ring-buffer logs for `ringmaster logs`.
+// LogDir is where the supervisor keeps each task's log file
+// (supervisor.LogFileName), which `ringmaster logs` reads when no daemon is
+// running.
 func (d *Daemon) LogDir() string {
 	return filepath.Join(filepath.Dir(d.StatePath), ".ringmaster", "logs")
-}
-
-// logPath maps a task key "proj:task" to its log file.
-func (d *Daemon) logPath(key string) string {
-	return filepath.Join(d.LogDir(), strings.ReplaceAll(key, ":", "_")+".log")
 }
 
 // SupervisorKey is the state-file key recording a supervisor itself.
@@ -236,32 +233,6 @@ func interpolateEnv(env map[string]string, vars config.Vars) (map[string]string,
 		out[name] = resolved[0]
 	}
 	return out, nil
-}
-
-// MirrorLogs streams a task's ring buffer into its log file so `ringmaster logs` can
-// tail it from another process.
-func (d *Daemon) MirrorLogs(sup *supervisor.Supervisor, key string) {
-	snap, ch, _, err := sup.Logs(key)
-	if err != nil {
-		return
-	}
-	go func() {
-		f, err := os.OpenFile(d.logPath(key), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "ringmaster: open log file for %s: %v\n", key, err)
-			return
-		}
-		defer f.Close()
-		write := func(e supervisor.LogEntry) {
-			fmt.Fprintf(f, "%s [%s] %s\n", e.TS.Format("15:04:05"), e.Stream, e.Line)
-		}
-		for _, e := range snap {
-			write(e)
-		}
-		for e := range ch {
-			write(e)
-		}
-	}()
 }
 
 // ReapProject reconciles all state entries belonging to projectID. If

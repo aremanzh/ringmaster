@@ -53,6 +53,7 @@ func (a *app) up(rest []string) error {
 	if err := os.MkdirAll(a.logDir(), 0o755); err != nil {
 		return fmt.Errorf("create log dir: %w", err)
 	}
+	sup.LogTo(a.logDir())
 
 	var started []string
 	taken := takenPorts(a.cfg)
@@ -73,7 +74,6 @@ func (a *app) up(rest []string) error {
 			if err := sup.Start(spec); err != nil {
 				return err
 			}
-			a.mirrorLogs(sup, spec.Key)
 			started = append(started, spec.Key)
 		}
 	}
@@ -117,11 +117,6 @@ func takenPorts(cfg *config.Config) map[int]bool {
 // buildSpecs delegates to the shared daemon assembly.
 func (a *app) buildSpecs(p config.Project, installs []discover.Install, taken map[int]bool) ([]supervisor.TaskSpec, error) {
 	return a.dmn().BuildSpecs(p, installs, taken)
-}
-
-// mirrorLogs delegates to the shared daemon assembly.
-func (a *app) mirrorLogs(sup *supervisor.Supervisor, key string) {
-	a.dmn().MirrorLogs(sup, key)
 }
 
 // down stops the target projects: kill the verified supervisor PID (Job
@@ -259,9 +254,13 @@ func (a *app) logs(rest []string) error {
 	}
 	defer f.Close()
 
-	if _, err := io.Copy(os.Stdout, f); err != nil {
+	// The file spans earlier runs, so print its tail (as much as the daemon
+	// keeps in memory), not all of it.
+	data, err := io.ReadAll(f)
+	if err != nil {
 		return fmt.Errorf("read logs: %w", err)
 	}
+	os.Stdout.Write(lastLines(data, 2000))
 	// Tail: poll for growth until interrupted.
 	interrupted := make(chan os.Signal, 1)
 	signal.Notify(interrupted, os.Interrupt)
@@ -275,4 +274,20 @@ func (a *app) logs(rest []string) error {
 			}
 		}
 	}
+}
+
+// lastLines returns the last n lines of data (all of it when shorter).
+func lastLines(data []byte, n int) []byte {
+	end := len(data)
+	if end > 0 && data[end-1] == '\n' {
+		end-- // the final newline ends the last line, it does not start one
+	}
+	for i := end - 1; i >= 0; i-- {
+		if data[i] == '\n' {
+			if n--; n == 0 {
+				return data[i+1:]
+			}
+		}
+	}
+	return data
 }
