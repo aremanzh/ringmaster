@@ -14,29 +14,6 @@ import (
 	"github.com/aremanzh/ringmaster/internal/config"
 )
 
-func newTestSupervisor(t *testing.T) *Supervisor {
-	t.Helper()
-	return New(filepath.Join(t.TempDir(), "ringmaster.state.json"))
-}
-
-func waitStatus(t *testing.T, s *Supervisor, key string, want Status, timeout time.Duration) {
-	t.Helper()
-	deadline := time.Now().Add(timeout)
-	var last Status
-	for time.Now().Before(deadline) {
-		for _, info := range s.List() {
-			if info.Key == key {
-				last = info.Status
-				if last == want {
-					return
-				}
-			}
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	t.Fatalf("task %s never reached %s (last: %s)", key, want, last)
-}
-
 // TestStdoutReadinessLifecycle: starting → running on stdout match, then a
 // clean Stop → stopped with the state entry removed.
 func TestStdoutReadinessLifecycle(t *testing.T) {

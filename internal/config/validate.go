@@ -8,7 +8,7 @@ import (
 
 // validRestart lists accepted restart policies. An empty string is treated
 // as "no".
-var validRestart = map[string]bool{"": true, "no": true, "on-failure": true}
+var validRestart = map[string]bool{"": true, "no": true, "on-failure": true, "always": true}
 
 // validReadyType lists accepted readiness probe types.
 var validReadyType = map[string]bool{"port": true, "stdout": true}
@@ -123,7 +123,7 @@ func validateTasks(p Project) error {
 			primaries++
 		}
 		if !validRestart[t.Restart] {
-			return fmt.Errorf("config: project %q: task %q: invalid restart policy %q (want \"no\" or \"on-failure\")", p.ID, t.ID, t.Restart)
+			return fmt.Errorf("config: project %q: task %q: invalid restart policy %q (want \"no\", \"on-failure\" or \"always\")", p.ID, t.ID, t.Restart)
 		}
 		if t.Ready != nil {
 			if !validReadyType[t.Ready.Type] {

@@ -39,10 +39,26 @@ const (
 	portReadyTimeout   = 30 * time.Second
 	stdoutReadyTimeout = 60 * time.Second
 	stopGrace          = 3 * time.Second
-	restartDelay       = 1 * time.Second
-	// maxConsecutiveFailures caps the on-failure restart loop so a task that
-	// crashes instantly cannot restart forever.
+	// maxConsecutiveFailures caps the restart loop so a task that crashes
+	// right after every start cannot restart forever.
 	maxConsecutiveFailures = 5
+)
+
+// Restart policies.
+const (
+	RestartOnFailure = "on-failure" // restart after a non-zero exit
+	RestartAlways    = "always"     // restart after any exit, clean or not
+)
+
+// Restart timing. Variables rather than constants so tests can shorten them.
+var (
+	// restartBaseDelay is the wait before the first restart. It doubles for
+	// every further restart in a row, up to restartMaxDelay.
+	restartBaseDelay = 1 * time.Second
+	restartMaxDelay  = 30 * time.Second
+	// stableRun is how long a task must stay up for its exit to count as a
+	// fresh event: the delay and the failure count both start over.
+	stableRun = 10 * time.Second
 )
 
 // TaskSpec is everything the supervisor needs to run one task. Argv must
@@ -55,7 +71,7 @@ type TaskSpec struct {
 	Port    int
 	Primary bool
 	Ready   *config.Ready
-	Restart string // "" or "no" or "on-failure"
+	Restart string // "", "no", RestartOnFailure or RestartAlways
 	// RequiresDocker runs a Docker-engine preflight before spawning.
 	RequiresDocker bool
 	// Cleanup holds absolute file paths removed before each spawn (leftovers
@@ -96,10 +112,63 @@ type task struct {
 	ring          *ring
 	startedAt     time.Time
 	stopRequested bool
-	failures      int
-	matched       chan struct{} // closed when the stdout ready pattern is seen
-	matchOnce     *sync.Once
-	exited        chan struct{} // closed when the monitor goroutine finishes
+	stopCh        chan struct{} // closed by Stop; cuts a pending restart delay short
+	// failures counts failed runs in a row and restarts counts restarts in a
+	// row; a stable run resets both. They carry over from one process
+	// generation to the next (respawn).
+	failures  int
+	restarts  int
+	matched   chan struct{} // closed when the stdout ready pattern is seen
+	matchOnce *sync.Once
+	exited    chan struct{} // closed when the monitor goroutine finishes
+}
+
+// newTask builds the bookkeeping for one process generation.
+func newTask(spec TaskSpec, r *ring) *task {
+	return &task{
+		spec: spec, ring: r,
+		stopCh:  make(chan struct{}),
+		matched: make(chan struct{}), matchOnce: &sync.Once{},
+		exited: make(chan struct{}),
+	}
+}
+
+// nextRestart applies the restart policy to a process that exited on its own
+// (not through Stop). stable says the run counted as a healthy one: it became
+// ready and stayed up for stableRun. It returns how long to wait before the
+// restart, or ok == false when the task should stay down. It updates the
+// failure and restart counters; call it with the supervisor lock held.
+func (t *task) nextRestart(exitCode int, stable bool) (delay time.Duration, ok bool) {
+	if stable {
+		t.failures, t.restarts = 0, 0
+	}
+	failed := exitCode != 0
+	switch t.spec.Restart {
+	case RestartAlways:
+	case RestartOnFailure:
+		if !failed {
+			return 0, false
+		}
+	default:
+		return 0, false
+	}
+	if failed {
+		if t.failures >= maxConsecutiveFailures {
+			return 0, false
+		}
+		t.failures++
+	} else {
+		// A clean exit (queue:restart, --max-time) is not a crash loop.
+		t.failures = 0
+	}
+	delay = restartMaxDelay
+	if t.restarts < 16 { // keep the shift far from overflow
+		if d := restartBaseDelay << t.restarts; d < restartMaxDelay {
+			delay = d
+		}
+	}
+	t.restarts++
+	return delay, true
 }
 
 // New creates a Supervisor persisting spawn records to statePath
@@ -130,7 +199,7 @@ func (s *Supervisor) Start(spec TaskSpec) error {
 		}
 	}
 
-	t := &task{spec: spec, ring: newRing(), matched: make(chan struct{}), matchOnce: &sync.Once{}, exited: make(chan struct{})}
+	t := newTask(spec, newRing())
 	if err := s.spawn(t); err != nil {
 		return err
 	}
@@ -296,22 +365,41 @@ func (s *Supervisor) monitor(t *task) {
 	if t.cmd.ProcessState != nil {
 		exitCode = t.cmd.ProcessState.ExitCode()
 	}
-	switch {
-	case t.stopRequested:
+	if t.stopRequested {
 		t.status = StatusStopped
-	case exitCode == 0:
-		t.status = StatusStopped
-	case t.spec.Restart == "on-failure" && t.failures < maxConsecutiveFailures:
-		t.failures++
-		failures := t.failures
+		s.mu.Unlock()
+		s.emit(t.spec.Key, StatusStopped, 0, t.spec.Port)
+		close(t.exited)
+		return
+	}
+
+	// A run that never became ready, or died soon after starting, is part of
+	// the same streak of trouble as the one before it.
+	stable := t.status == StatusRunning && time.Since(t.startedAt) >= stableRun
+	if delay, ok := t.nextRestart(exitCode, stable); ok {
 		t.status = StatusStarting
-		t.ring.Append("err", fmt.Sprintf("ringmaster: exited with code %d; restart %d/%d in %s", exitCode, failures, maxConsecutiveFailures, restartDelay))
+		if exitCode == 0 {
+			t.ring.Append("err", fmt.Sprintf("ringmaster: exited cleanly; restarting in %s", delay))
+		} else {
+			t.ring.Append("err", fmt.Sprintf("ringmaster: exited with code %d; restart %d/%d in %s", exitCode, t.failures, maxConsecutiveFailures, delay))
+		}
 		s.mu.Unlock()
 		s.emit(t.spec.Key, StatusStarting, 0, t.spec.Port)
-		time.Sleep(restartDelay)
+		select {
+		case <-time.After(delay):
+		case <-t.stopCh: // Stop arrived: respawn sees stopRequested
+		}
 		s.respawn(t)
 		close(t.exited)
 		return
+	}
+
+	switch {
+	case exitCode == 0:
+		t.status = StatusStopped
+	case t.spec.Restart == RestartOnFailure || t.spec.Restart == RestartAlways:
+		t.status = StatusFailed
+		t.ring.Append("err", fmt.Sprintf("ringmaster: exited with code %d; giving up after %d failed restarts in a row", exitCode, maxConsecutiveFailures))
 	default:
 		t.status = StatusFailed
 		t.ring.Append("err", fmt.Sprintf("ringmaster: exited with code %d", exitCode))
@@ -322,7 +410,10 @@ func (s *Supervisor) monitor(t *task) {
 	close(t.exited)
 }
 
-// respawn restarts a failed on-failure task unless a stop arrived meanwhile.
+// respawn starts the next process generation of a task being restarted by
+// its policy, unless a stop arrived meanwhile. The old generation t stays
+// registered until the new process is fully spawned, so a concurrent Stop or
+// List never sees a half-built task.
 func (s *Supervisor) respawn(t *task) {
 	s.mu.Lock()
 	if t.stopRequested {
@@ -331,19 +422,33 @@ func (s *Supervisor) respawn(t *task) {
 		s.emit(t.spec.Key, StatusStopped, 0, t.spec.Port)
 		return
 	}
-	// Fresh channels for the new process generation.
-	nt := &task{
-		spec: t.spec, ring: t.ring, failures: t.failures,
-		matched: make(chan struct{}), matchOnce: &sync.Once{}, exited: make(chan struct{}),
-	}
-	s.tasks[t.spec.Key] = nt
 	s.mu.Unlock()
+
+	// Fresh channels for the new process generation; the log buffer and the
+	// counters carry over.
+	nt := newTask(t.spec, t.ring)
+	nt.failures, nt.restarts = t.failures, t.restarts
 	if err := s.spawn(nt); err != nil {
 		s.mu.Lock()
-		nt.status = StatusFailed
+		t.status = StatusFailed
+		if t.stopRequested {
+			t.status = StatusStopped
+		}
+		status := t.status
 		s.mu.Unlock()
-		nt.ring.Append("err", "ringmaster: restart failed: "+err.Error())
-		s.emit(nt.spec.Key, StatusFailed, 0, nt.spec.Port)
+		t.ring.Append("err", "ringmaster: restart failed: "+err.Error())
+		s.emit(t.spec.Key, status, 0, t.spec.Port)
+		return
+	}
+
+	s.mu.Lock()
+	s.tasks[t.spec.Key] = nt
+	stopped := t.stopRequested
+	s.mu.Unlock()
+	if stopped {
+		// Stop arrived while the new process was being spawned: it is waiting
+		// on the old generation, so take the new one down on its behalf.
+		_ = s.Stop(t.spec.Key)
 	}
 }
 
@@ -360,7 +465,10 @@ func (s *Supervisor) Stop(key string) error {
 		s.mu.Unlock()
 		return nil
 	}
-	t.stopRequested = true
+	if !t.stopRequested {
+		t.stopRequested = true
+		close(t.stopCh)
+	}
 	t.status = StatusStopping
 	group := t.group
 	s.mu.Unlock()
@@ -401,7 +509,13 @@ func (s *Supervisor) List() []TaskInfo {
 	for _, t := range s.tasks {
 		info := TaskInfo{Key: t.spec.Key, Status: t.status, Port: t.spec.Port, StartedAt: t.startedAt}
 		if t.group != nil && (t.status == StatusStarting || t.status == StatusRunning || t.status == StatusStopping) {
-			info.PID = t.group.PID()
+			// A task waiting out a restart delay is "starting" with its old
+			// process already gone: report no PID rather than a dead one.
+			select {
+			case <-t.group.Done():
+			default:
+				info.PID = t.group.PID()
+			}
 		}
 		out = append(out, info)
 	}

@@ -60,7 +60,9 @@ type Task struct {
 	// Autostart controls whether `ringmaster up <project>` starts this task.
 	// Nil means true (start by default).
 	Autostart *bool `yaml:"autostart,omitempty"`
-	// Restart is the restart policy: "" (treated as "no"), "no", or "on-failure".
+	// Restart is the restart policy: "" (treated as "no"), "no", "on-failure"
+	// (restart after a non-zero exit) or "always" (restart after any exit the
+	// user did not ask for, e.g. a queue worker told to quit by queue:restart).
 	Restart string `yaml:"restart,omitempty"`
 	// Ready is the optional readiness probe. Nil means the task is considered
 	// running as soon as it is spawned.

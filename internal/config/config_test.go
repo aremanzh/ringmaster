@@ -57,6 +57,9 @@ func TestParseValid(t *testing.T) {
 	if p.Tasks[2].Restart != "on-failure" {
 		t.Errorf("queue restart = %q", p.Tasks[2].Restart)
 	}
+	if _, err := Parse([]byte(strings.Replace(validYAML, `restart: "on-failure"`, `restart: "always"`, 1))); err != nil {
+		t.Errorf(`restart: "always" rejected: %v`, err)
+	}
 }
 
 func TestValidateErrors(t *testing.T) {
@@ -149,7 +152,7 @@ func TestValidateErrors(t *testing.T) {
 		},
 		{
 			name:    "invalid restart policy",
-			mutate:  func(s string) string { return strings.Replace(s, `restart: "on-failure"`, `restart: "always"`, 1) },
+			mutate:  func(s string) string { return strings.Replace(s, `restart: "on-failure"`, `restart: "sometimes"`, 1) },
 			wantErr: "invalid restart policy",
 		},
 		{

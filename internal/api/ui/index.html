@@ -524,6 +524,7 @@ function taskRowHTML(t, i) {
         onchange="edTask(${i},'restart',this.value)">
         <option value="" ${!t.restart ? "selected" : ""}>no restart</option>
         <option value="on-failure" ${t.restart === "on-failure" ? "selected" : ""}>on-failure</option>
+        <option value="always" ${t.restart === "always" ? "selected" : ""}>always</option>
       </select>
     </div>
   </div>`;
@@ -570,7 +571,7 @@ function presetTasks(preset, command) {
     return [serve,
       { id: "vite", argv: ["npm.cmd", "run", "dev", "--", "--host={host}"],
         ready: { type: "stdout", match: "ready in" }, cleanup: ["public/hot"] },
-      { id: "queue", autostart: false, restart: "on-failure",
+      { id: "queue", autostart: false, restart: "always",
         argv: ["{php}", "artisan", "queue:work"] }];
   if (preset === "laravel-serve") return [serve];
   const argv = (command || "").trim().split(/\s+/).filter(Boolean);
