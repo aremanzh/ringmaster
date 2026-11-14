@@ -181,7 +181,7 @@ go vet ./...
 go test ./...
 ```
 
-Every push and pull request runs `go vet`, the tests and a build on Windows and Ubuntu (`.github/workflows/ci.yml`). Windows is the supported platform; the Ubuntu run keeps the macOS/Linux code paths from breaking unnoticed. Pushing a `v*` tag builds both binaries on GitHub Actions and publishes them as a release.
+Every push and pull request runs `go vet`, the tests and a build on Windows and Ubuntu (`.github/workflows/ci.yml`). Windows is the supported platform; the Ubuntu run keeps the macOS/Linux code paths from breaking unnoticed. Pushing a `v*` tag builds both binaries on GitHub Actions and publishes them as a release. Without a checkout at hand, run the `release` workflow from the Actions tab on `main` and enter the version (for example `v0.1.3`): it checks that `CHANGELOG.md` has that entry, runs the tests and the build, then creates the tag and the release.
 
 The icon is drawn by `go run ./tools/genassets`, which writes `assets/icon/ringmaster.ico`, a 256 px PNG and the UI's `favicon.png`. The `.syso` files that put the icon into each `.exe` come from that `.ico`:
 
