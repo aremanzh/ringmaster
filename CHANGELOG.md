@@ -2,6 +2,33 @@
 
 Notable, user-facing changes. Newest first.
 
+## 0.1.3 — unreleased
+
+- **Security: other web pages can no longer drive the API.** While
+  `ringmaster serve` was running, any page open in your browser could send
+  requests to `127.0.0.1:9090`, add a project with a command of its choice and
+  start it. Requests that change anything are now accepted only from the
+  Ringmaster page itself or from non-browser clients (the CLI, `curl`);
+  requests with a foreign `Host` header are rejected, which closes the DNS
+  rebinding route; JSON bodies must be sent as `application/json`. The desktop
+  app was not affected: it does not open a port. If you ran `ringmaster serve`
+  on 0.1.2 or earlier, check `ringmaster.yaml` for projects you did not add.
+- **`-listen` on a non-loopback address now requires an access token.**
+  `ringmaster serve -listen 0.0.0.0:9090` prints a URL ending in `?token=...`;
+  open it once per browser. API clients send `Authorization: Bearer <token>`.
+  The CLI picks the token up by itself. The token changes on every start.
+- **New: `restart: always`.** Restarts a task after any exit you did not ask
+  for, including a clean one. Use it for queue workers: `artisan queue:restart`,
+  `--max-time` and `--max-jobs` make the worker exit with code 0, which
+  `on-failure` leaves stopped. The Laravel template in the UI now uses it.
+- **Fixed: `on-failure` stopped restarting after 5 crashes in total.** The
+  limit was meant to be 5 in a row, but the count never went back to zero, so a
+  worker that crashed now and then stayed down after the fifth time. A run of
+  10 seconds or more now resets it.
+- Restarts back off: 1 s, then doubling up to 30 s while the task keeps exiting
+  right after it starts. Stopping a task during that wait takes effect at once.
+- A task waiting to be restarted no longer shows the PID of its dead process.
+
 ## 0.1.2 — 2026-11-09
 
 - **Fixed: one busy port no longer takes everything down.** If an autostart

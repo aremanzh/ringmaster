@@ -77,7 +77,7 @@ projects:
       - id: queue
         argv: ["{php}", "artisan", "queue:work"]
         autostart: false
-        restart: on-failure
+        restart: always
 ```
 
 See [`ringmaster.example.yaml`](ringmaster.example.yaml) for every option.
@@ -112,7 +112,12 @@ The same daemon serves a JSON API:
 - WebSocket `/api/events` streams task status changes.
 - WebSocket `/api/tasks/{project}/{task}/logs/ws` sends the buffered log, then follows it live.
 
-The API has no authentication. It binds to loopback by default; don't use `-listen 0.0.0.0` on a network you don't trust.
+The API can add a project with any command and start it, so it is guarded:
+
+- It binds to loopback by default. On loopback there is no login, but a request that changes anything must come from the Ringmaster page itself or from a non-browser client such as the CLI or `curl`. Requests from other web pages are rejected (403), as are requests whose `Host` header is not `localhost`, an IP address or this PC's name, and JSON bodies need `Content-Type: application/json`.
+- With `-listen` on any other address, for example `-listen 0.0.0.0:9090` to open the UI from your phone, `ringmaster serve` generates an access token on every start and prints a URL ending in `?token=...`. Open that URL once per browser; it sets a cookie and the token leaves the address bar. API clients send `Authorization: Bearer <token>`. The CLI reads the token from `ringmaster.daemon.json`, so `ps`, `logs`, `up` and `down` keep working.
+
+The token travels over plain HTTP, so anyone who can watch the network can read it. Use a non-loopback `-listen` only on a network you trust.
 
 ## Config notes
 
@@ -120,7 +125,8 @@ The API has no authentication. It binds to loopback by default; don't use `-list
 - `{php}`, `{host}` and `{port}` are replaced inside `argv`.
 - Readiness probes either poll the port (`type: port`, 30 s) or wait for a substring on stdout (`type: stdout`, 60 s).
 - Each task keeps its last 2000 lines (up to 1 MB) of output in memory, mirrored to a file so another process can tail it. Console output that isn't UTF-8 (cp1252, cp850 and so on) is decoded with the active codepage first.
-- `restart: on-failure` restarts a task that exits with a non-zero code, at most 5 times in a row.
+- `restart: on-failure` restarts a task that exits with a non-zero code. `restart: always` also restarts it after a clean exit, which is what a queue worker needs: `artisan queue:restart`, `--max-time` and `--max-jobs` all make the worker exit with code 0 and expect something to start it again. Stopping a task yourself never triggers a restart.
+- The first restart comes after 1 s. If the task exits again within 10 s of starting, or before it is ready, the wait doubles each time up to 30 s. After 5 failed restarts in a row the task is marked `failed`. A run of 10 s or more starts the count and the wait over, and clean exits never count toward the limit.
 - `defaults.host: lan` binds to the current LAN IPv4: the adapter with the default route, skipping WSL and Hyper-V adapters. Ringmaster detects it at startup and again on every start or restart. When the address has changed, restarting a task picks up the new IP; tasks already running stay on the old one until restarted. With no LAN, it falls back to `127.0.0.1`.
 - With `host: lan`, pages open on the LAN IP, and Vite's default CORS policy only allows `localhost` origins, so the browser blocks scripts from `:5173`. Allow private-network origins in your project's `vite.config.js`:
 

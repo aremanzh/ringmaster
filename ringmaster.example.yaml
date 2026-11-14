@@ -34,7 +34,11 @@ projects:
       - id: "queue"
         argv: ["{php}", "artisan", "queue:work", "--queue=high,low,default"]
         autostart: false             # not started by `ringmaster up`
-        restart: "on-failure"        # restarted on non-zero exit (max 5 in a row)
+        restart: "always"            # restarted whenever it exits by itself, so
+                                     # `artisan queue:restart` brings up a fresh
+                                     # worker. "on-failure" = only after a
+                                     # non-zero exit. Gives up after 5 failed
+                                     # restarts in a row.
 
 # --- M3 examples ---
 # An externally-managed service ringmaster only observes (status = port probe):
