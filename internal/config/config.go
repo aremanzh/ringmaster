@@ -78,6 +78,12 @@ type Task struct {
 	// RequiresDocker makes starting this task fail fast with a clear message
 	// when the Docker engine is not reachable (preflight `docker version`).
 	RequiresDocker bool `yaml:"requires_docker,omitempty"`
+	// Cwd is the task's working directory, relative to the project path and
+	// inside it (e.g. "frontend" in a monorepo). Empty means the project path.
+	Cwd string `yaml:"cwd,omitempty"`
+	// Env holds extra environment variables for the task, on top of the ones
+	// ringmaster itself runs with. Values may use {php}, {host} and {port}.
+	Env map[string]string `yaml:"env,omitempty"`
 	// Cleanup lists files, relative to the project path, that ringmaster deletes
 	// before the task starts and after it exits. For tools that leave a
 	// marker behind when killed instead of exiting cleanly, e.g. Vite's

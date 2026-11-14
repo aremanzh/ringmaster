@@ -68,14 +68,21 @@ var (
 // TaskSpec is everything the supervisor needs to run one task. Argv must
 // already be interpolated (no {php}/{host}/{port} placeholders left).
 type TaskSpec struct {
-	Key     string // "<projectId>:<taskId>"
-	Dir     string // working directory (the project path)
-	Argv    []string
-	Host    string
-	Port    int
-	Primary bool
-	Ready   *config.Ready
-	Restart string // "", "no", RestartOnFailure or RestartAlways
+	Key  string // "<projectId>:<taskId>"
+	Dir  string // working directory (the project path, or the task's cwd in it)
+	Argv []string
+	// Env holds the task's own environment variables, applied on top of this
+	// process's environment. Values are already interpolated.
+	Env map[string]string
+	// PathPrepend lists directories put in front of the task's PATH (the
+	// project's PHP folder), so anything the task shells out to finds the
+	// same binaries. A bare argv[0] is looked up there first too.
+	PathPrepend []string
+	Host        string
+	Port        int
+	Primary     bool
+	Ready       *config.Ready
+	Restart     string // "", "no", RestartOnFailure or RestartAlways
 	// RequiresDocker runs a Docker-engine preflight before spawning.
 	RequiresDocker bool
 	// Cleanup holds absolute file paths removed before each spawn (leftovers
@@ -217,13 +224,14 @@ func (s *Supervisor) Start(spec TaskSpec) error {
 // spawn builds and starts the process for t, wires log pumps, persists the
 // state entry, and launches the readiness and monitor goroutines.
 func (s *Supervisor) spawn(t *task) error {
-	argv, err := wrapArgv(t.spec.Argv)
+	argv, err := wrapArgvIn(t.spec.Argv, t.spec.PathPrepend)
 	if err != nil {
 		return fmt.Errorf("supervisor: %s: %w", t.spec.Key, err)
 	}
 	t.cleanup()
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = t.spec.Dir
+	cmd.Env = taskEnv(t.spec.Env, t.spec.PathPrepend)
 	// Plain OS pipes that this package reads to the end itself. With
 	// cmd.StdoutPipe, Wait closes the read side the moment the process
 	// exits, which threw away whatever a short-lived process had printed:
@@ -633,7 +641,12 @@ func (s *Supervisor) ReapOrphans() ([]ReapResult, error) {
 // shell:false. The rewrite never exposes cmd.exe semantics to the config:
 // arguments stay an array end to end.
 func wrapArgv(argv []string) ([]string, error) {
-	exe, err := exec.LookPath(argv[0])
+	return wrapArgvIn(argv, nil)
+}
+
+// wrapArgvIn is wrapArgv with dirs searched before PATH for a bare argv[0].
+func wrapArgvIn(argv []string, dirs []string) ([]string, error) {
+	exe, err := resolveExe(argv[0], dirs)
 	if err != nil {
 		return nil, fmt.Errorf("resolve %q: %w", argv[0], err)
 	}

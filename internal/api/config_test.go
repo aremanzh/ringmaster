@@ -146,6 +146,8 @@ func TestGetProjectRoundTrip(t *testing.T) {
 			"restart": "on-failure", "requires_docker": true,
 			"ready":   map[string]string{"type": "stdout", "match": "ready"},
 			"cleanup": []string{"public/hot"},
+			"cwd":     "docker",
+			"env":     map[string]string{"COMPOSE_PROJECT_NAME": "rt", "APP_URL": "http://{host}:{port}"},
 		}},
 	})
 	res.Body.Close()
@@ -195,6 +197,9 @@ func TestGetProjectRoundTrip(t *testing.T) {
 	if !task.RequiresDocker || task.Restart != "on-failure" || task.Ready == nil || task.Ready.Match != "ready" ||
 		len(task.Cleanup) != 1 || task.Cleanup[0] != "public/hot" {
 		t.Fatalf("saved task = %+v", task)
+	}
+	if task.Cwd != "docker" || len(task.Env) != 2 || task.Env["APP_URL"] != "http://{host}:{port}" {
+		t.Fatalf("cwd/env lost in the round-trip: %+v", task)
 	}
 }
 

@@ -20,7 +20,7 @@ Laravel's `php artisan dev` helps with one project in one terminal. Ringmaster i
 
 ## What Ringmaster does
 
-- Each project runs on its own PHP version, all at the same time. `php: "8.2"` on one project and `php: "8.4"` on the next resolve to real `php.exe` installs from your PHP folders (Laragon's `bin\php` works) or from PATH. Nothing global is switched.
+- Each project runs on its own PHP version, all at the same time. `php: "8.2"` on one project and `php: "8.4"` on the next resolve to real `php.exe` installs from your PHP folders (Laragon's `bin\php` works) or from PATH. Nothing global is switched. That PHP also leads the `PATH` of every task in the project, so `composer` and npm scripts that call `php` get the same version.
 - One daemon supervises every project. You control it from a web UI, a desktop app or the CLI, with live status, start/stop/restart per task, and live logs.
 - Stopping a task stops its whole process tree. Ringmaster puts every task in a Windows Job Object, so child processes such as Vite's `esbuild.exe` die with it and the port is freed.
 - Before starting a project, Ringmaster checks its port. If something holds it, Ringmaster tells you the PID and the program name.
@@ -122,7 +122,10 @@ The token travels over plain HTTP, so anyone who can watch the network can read 
 ## Config notes
 
 - `argv` is always an array and is spawned with `shell: false`, so there is no shell interpolation. `.cmd` and `.bat` files (for example `npm.cmd`) run through `cmd.exe /c` automatically.
-- `{php}`, `{host}` and `{port}` are replaced inside `argv`.
+- `{php}`, `{host}` and `{port}` are replaced inside `argv` and in `env` values.
+- A project with a `php` version has that PHP's folder put first on the `PATH` of all its tasks. `{php}` is the project's PHP in `argv`; the `PATH` entry covers everything a task starts in turn: `composer`, `npm run dev` scripts that call `php artisan`, a `Procfile` runner. A bare `argv[0]` such as `php` is looked up in that folder first, then on Ringmaster's own `PATH`. A `php` version that is not installed is now an error on that project even when no task uses `{php}`.
+- `env` adds environment variables to one task, on top of the ones Ringmaster runs with: `env: { APP_URL: "http://{host}:{port}" }`. Setting `PATH` there replaces the inherited one; the project's PHP folder is still put in front.
+- `cwd` runs a task in a subfolder of the project, for example `cwd: frontend` in a monorepo. It is relative to the project path and cannot leave it. `cleanup` paths stay relative to the project path.
 - Readiness probes either poll the port (`type: port`, 30 s) or wait for a substring on stdout (`type: stdout`, 60 s).
 - Each task keeps its last 2000 lines (up to 1 MB) of output in memory, mirrored to a file so another process can tail it. Console output that isn't UTF-8 (cp1252, cp850 and so on) is decoded with the active codepage first.
 - `restart: on-failure` restarts a task that exits with a non-zero code. `restart: always` also restarts it after a clean exit, which is what a queue worker needs: `artisan queue:restart`, `--max-time` and `--max-jobs` all make the worker exit with code 0 and expect something to start it again. Stopping a task yourself never triggers a restart.
