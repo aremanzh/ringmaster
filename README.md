@@ -102,13 +102,20 @@ While `ringmaster serve` runs (found through `ringmaster.daemon.json`), `ps`, `u
 
 ## Web UI and API
 
-`ringmaster serve` listens on `127.0.0.1:9090` by default. The web UI is embedded in the binary. It lists every project and task with live status, start/stop/restart buttons and a live log pane, and it can start tasks that don't autostart, such as a queue worker.
+`ringmaster serve` listens on `127.0.0.1:9090` by default. The web UI is embedded in the binary, fonts included, so it works offline.
+
+- The home screen is a board with one card per project. Each card has a ring with one node per task: the main task sits on top and turns amber when the app is up, a failed task turns red, a stopped one is hollow.
+- The port on a running project is a link that opens the app.
+- When a task fails, the card says why: the exit code and the last line it printed, or the reason it could not start, such as a busy port and the program holding it. "Try again" is on the card.
+- "Log" on a task opens its live log beside the board, with a search box. Restarting a task keeps the earlier output.
+- "Settings" on a card opens the project's configuration; "PHP" lists the PHP versions found and which project uses which.
+- It follows the system's light or dark setting, with a switch in the header, and it has a phone layout for checking on things over the LAN.
 
 You can also manage the registry from the UI: add a project (folder, PHP version, and a Laravel or custom-command template), remove one (its tasks are stopped first and the folder is never deleted), and add or remove `php_roots` with a live list of the PHP installs found. Ringmaster validates each change, writes `ringmaster.yaml` atomically (temp file + rename) and applies it without a restart. The file is regenerated on save, so hand-written comments in `ringmaster.yaml` are lost.
 
 The same daemon serves a JSON API:
 
-- `GET /api/status`
+- `GET /api/status`: every project with its port and URL, and every task with its status, PID, start time, run count and, when it failed, its exit code and last output line.
 - `POST /api/projects/{id}/{start|stop|restart}`
 - `POST /api/tasks/{project}/{task}/{start|stop|restart}`
 - `GET /api/tasks/{project}/{task}/logs`

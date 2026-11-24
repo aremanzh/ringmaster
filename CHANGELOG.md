@@ -4,6 +4,22 @@ Notable, user-facing changes. Newest first.
 
 ## Unreleased
 
+- **New look and layout, built around the logo.** The home screen is now a
+  board of project cards in Ringmaster's own colours and typeface, in light
+  and dark. Each project has a ring with one node per task; when everything is
+  up it draws the logo.
+- **A failed task says why.** The card shows the exit code and the last line
+  the task printed, or why it could not start (for example which program holds
+  its port), with "Try again" next to it. Before, you had to open the log.
+- **The port is a link.** Click it to open the running app in your browser.
+- **It works on a phone.** The old page was wider than a phone screen and its
+  panels overlapped. There is now a proper small-screen layout.
+- **Settings moved out of the way.** The configuration editor no longer takes
+  a quarter of the window; it opens from "Settings" on a card. "Remove project"
+  moved in there too, away from the everyday buttons.
+- The PHP screen shows which project uses which PHP version.
+- `GET /api/status` reports each project's `port` and `url`, and for a task its
+  `run` count and, when it failed, `exit_code` and `last_output`.
 - The project editor has fields for a task's subfolder (`cwd`) and environment
   variables (`env`), under "folder and environment" on each task. Until now
   they could only be set in `ringmaster.yaml`.
