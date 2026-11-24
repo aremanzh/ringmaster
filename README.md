@@ -109,6 +109,7 @@ While `ringmaster serve` runs (found through `ringmaster.daemon.json`), `ps`, `u
 - When a task fails, the card says why: the exit code and the last line it printed, or the reason it could not start, such as a busy port and the program holding it. "Try again" is on the card.
 - "Log" on a task opens its live log beside the board, with a search box. Restarting a task keeps the earlier output.
 - "Settings" on a card opens the project's configuration; "PHP" lists the PHP versions found and which project uses which.
+- Folder fields have a "Browse" button. The desktop app opens the Windows folder dialog. In a browser, which cannot give a page a real folder path, Ringmaster lists the folders itself, so it also works from a phone. Picking a folder for a new project fills in its id from the folder name.
 - It follows the system's light or dark setting, with a switch in the header, and it has a phone layout for checking on things over the LAN.
 
 You can also manage the registry from the UI: add a project (folder, PHP version, and a Laravel or custom-command template), remove one (its tasks are stopped first and the folder is never deleted), and add or remove `php_roots` with a live list of the PHP installs found. Ringmaster validates each change, writes `ringmaster.yaml` atomically (temp file + rename) and applies it without a restart. The file is regenerated on save, so hand-written comments in `ringmaster.yaml` are lost.
@@ -119,6 +120,7 @@ The same daemon serves a JSON API:
 - `POST /api/projects/{id}/{start|stop|restart}`
 - `POST /api/tasks/{project}/{task}/{start|stop|restart}`
 - `GET /api/tasks/{project}/{task}/logs`
+- `GET /api/fs?path=...` lists a folder's subfolders, for the folder picker.
 - WebSocket `/api/events` streams task status changes.
 - WebSocket `/api/tasks/{project}/{task}/logs/ws` sends the buffered log, then follows it live.
 

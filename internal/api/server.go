@@ -78,6 +78,7 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("GET /api/config/projects/{project}", s.handleGetProject)
 		mux.HandleFunc("PUT /api/config/projects/{project}", s.handleUpdateProject)
 		mux.HandleFunc("DELETE /api/config/projects/{project}", s.handleDeleteProject)
+		mux.HandleFunc("GET /api/fs", s.handleListDir)
 		mux.HandleFunc("POST /api/config/phproots", s.handleAddPHPRoot)
 		mux.HandleFunc("DELETE /api/config/phproots", s.handleDeletePHPRoot)
 	}

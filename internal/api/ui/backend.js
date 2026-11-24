@@ -107,6 +107,11 @@
 
   window.Backend = {
     get isWails() { return inWails(); },
+    // pickFolder opens the system's folder dialog in the desktop app and
+    // resolves to the chosen path ("" when cancelled). A browser cannot hand
+    // a page a real folder path, so there it resolves to null and the page
+    // shows its own picker, backed by GET /api/fs.
+    pickFolder: start => inWails() ? app().PickFolder(start || "") : Promise.resolve(null),
     request: (path, opts) => (inWails() ? wailsRequest : webRequest)(path, opts),
     openEvents: h => (inWails() ? wailsEvents : webEvents)(h),
     openLogs: (project, task, h) => (inWails() ? wailsLogs : webLogs)(project, task, h),

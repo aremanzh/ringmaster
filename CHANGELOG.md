@@ -17,6 +17,10 @@ Notable, user-facing changes. Newest first.
 - **Settings moved out of the way.** The configuration editor no longer takes
   a quarter of the window; it opens from "Settings" on a card. "Remove project"
   moved in there too, away from the everyday buttons.
+- **Pick folders instead of typing them.** The project folder and the PHP
+  folder have a "Browse" button: the Windows folder dialog in the desktop app,
+  and a folder list in the browser that also works from a phone. Picking a
+  folder for a new project suggests its id.
 - The PHP screen shows which project uses which PHP version.
 - `GET /api/status` reports each project's `port` and `url`, and for a task its
   `run` count and, when it failed, `exit_code` and `last_output`.

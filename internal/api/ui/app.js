@@ -14,6 +14,7 @@ let state = { projects: [], config_path: "" };
 let php = { roots: [], installs: [] };
 let log = null;      // { project, task, entries, find, follow, close, missing }
 let sheet = null;    // { kind: "settings" | "add" | "php", draft, opener }
+let picker = null;   // { target, listing, opener }: the folder picker over a sheet
 let firstBoard = true;
 
 const $ = id => document.getElementById(id);
@@ -495,7 +496,10 @@ function editorSheetHTML() {
     <div class="field"><label for="ed-label">Name</label>
       <input class="input" id="ed-label" value="${esc(d.label || "")}" placeholder="${esc(d.id || "My Laravel app")}"></div>
     <div class="field"><label for="ed-path">Folder</label>
-      <input class="input mono" id="ed-path" value="${esc(d.path || "")}" placeholder="C:\\code\\myapp" autocomplete="off" spellcheck="false"></div>
+      <div class="with-browse">
+        <input class="input mono" id="ed-path" value="${esc(d.path || "")}" placeholder="C:\\code\\myapp" autocomplete="off" spellcheck="false">
+        <button type="button" class="btn tile" data-act="browse" data-target="ed-path">Browse</button>
+      </div></div>
     <div class="row2">
       <div class="field"><label for="ed-php">PHP version</label>
         <input class="input mono" id="ed-php" value="${esc(d.php || "")}" placeholder="8.3" autocomplete="off"></div>
@@ -691,7 +695,8 @@ function phpSheetHTML() {
         : `<p class="quiet">None added, so Ringmaster uses the PHP on PATH and the default Laragon, XAMPP, Herd and Scoop folders.
             Adding a folder here switches those defaults off.</p>`}
       <form class="inline-form" data-form="add-root">
-        <input class="input mono" name="path" required placeholder="C:\\laragon\\bin\\php" aria-label="Folder that holds PHP versions" autocomplete="off" spellcheck="false">
+        <input class="input mono" id="php-root-path" name="path" required placeholder="C:\\laragon\\bin\\php" aria-label="Folder that holds PHP versions" autocomplete="off" spellcheck="false">
+        <button type="button" class="btn tile" data-act="browse" data-target="php-root-path">Browse</button>
         <button type="submit" class="btn strong">Add folder</button>
       </form>
     </div>
@@ -712,6 +717,105 @@ async function removeRoot(path) {
   catch (e) { return fail("Folder not removed", e); }
   await loadPHP();
   refresh();
+}
+
+/* ---------- folder picker ---------- */
+
+// browseFor fills the input `target` with a folder the user picks. The
+// desktop app uses the system dialog. A browser cannot hand a page a real
+// folder path, so there the daemon lists folders and the page shows them.
+async function browseFor(target) {
+  const start = $(target).value.trim();
+  if (Backend.isWails) {
+    try {
+      const chosen = await Backend.pickFolder(start);
+      if (chosen) usePickedFolder(target, chosen);
+    } catch (e) { fail("Folder dialog", e); }
+    return;
+  }
+  picker = { target, listing: null, opener: document.activeElement };
+  $("picker").hidden = false;
+  $("picker-backdrop").hidden = false;
+  $("picker").innerHTML = PICKER_HEAD + `<p class="quiet" style="padding: 0 24px">Reading folders…</p>`;
+  // Start where the field points, or at the home folder if that is not a folder.
+  if (!(await pickerGo(start, true)) && start) await pickerGo("");
+}
+
+// pickerGo lists `path` in the picker. It returns false when the folder
+// could not be read; `quiet` suppresses the error message.
+async function pickerGo(path, quiet) {
+  let listing;
+  try { listing = await api("/api/fs?path=" + encodeURIComponent(path)); }
+  catch (e) { if (!quiet) fail("Cannot open that folder", e); return false; }
+  if (!picker) return true;   // closed while loading
+  picker.listing = listing;
+  renderPicker();
+  return true;
+}
+
+const PICKER_HEAD = `<div class="sheet-head">
+  <div><h2 id="picker-title">Pick a folder</h2></div>
+  <button type="button" class="btn tile sm" data-act="pick-cancel">Cancel</button>
+</div>`;
+
+const MARKER_NOTES = [
+  ["artisan", "A Laravel project is in this folder."],
+  ["composer.json", "A Composer project is in this folder."],
+  ["package.json", "A Node project is in this folder."],
+  ["php.exe", "PHP is in this folder."],
+  ["php", "PHP is in this folder."],
+];
+
+function renderPicker() {
+  const l = picker.listing;
+  const note = (MARKER_NOTES.find(([file]) => l.markers.includes(file)) || [])[1] || "";
+  $("picker").innerHTML = PICKER_HEAD + `
+    <div class="picker-bar">
+      <form class="inline-form" data-form="pick-path">
+        <input class="input mono" id="picker-path" value="${esc(l.path)}" aria-label="Folder path" autocomplete="off" spellcheck="false">
+        <button type="submit" class="btn tile">Go</button>
+      </form>
+      <div class="picker-places">
+        ${l.parent ? `<button type="button" class="btn tile sm" data-act="pick-go" data-path="${esc(l.parent)}">Up one level</button>` : ""}
+        ${l.roots.length > 1 || !l.parent ? l.roots.map(r =>
+          `<button type="button" class="btn tile sm mono" data-act="pick-go" data-path="${esc(r)}">${esc(r)}</button>`).join("") : ""}
+        <button type="button" class="btn tile sm" data-act="pick-go" data-path="">Home</button>
+      </div>
+    </div>
+    <ul class="picker-list" aria-label="Folders in ${esc(l.path)}">
+      ${l.dirs.length ? l.dirs.map(d => `<li><button type="button" class="${/^[.$]/.test(d.name) ? "hidden-dir" : ""}" data-act="pick-go" data-path="${esc(d.path)}">
+          <span class="folder" aria-hidden="true"></span><span class="name">${esc(d.name)}</span></button></li>`).join("")
+        : `<li class="quiet">No folders in here.</li>`}
+      ${l.truncated ? `<li class="quiet">More folders than can be listed. Type the path above.</li>` : ""}
+    </ul>
+    <div class="sheet-foot">
+      <button type="button" class="btn strong" data-act="pick-use">Use this folder</button>
+      ${note ? `<span class="note">${esc(note)}</span>` : ""}
+    </div>`;
+  $("picker").querySelector(".picker-list").scrollTop = 0;
+  const field = $("picker-path");   // a long path shows its end, the part that changes
+  field.scrollLeft = field.scrollWidth;
+}
+
+function closePicker() {
+  const opener = picker && picker.opener;
+  picker = null;
+  $("picker").hidden = true;
+  $("picker-backdrop").hidden = true;
+  $("picker").innerHTML = "";
+  if (opener && document.contains(opener)) opener.focus();
+}
+
+function usePickedFolder(target, path) {
+  const input = $(target);
+  if (!input) return;
+  input.value = path;
+  // A new project with no id yet takes one from the folder's name.
+  if (target === "ed-path" && $("ed-id") && !$("ed-id").value.trim()) {
+    const name = path.split(/[\\/]/).filter(Boolean).pop() || "";
+    $("ed-id").value = name.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^[-_]+|-+$/g, "");
+  }
+  input.focus();
 }
 
 /* ---------- events ---------- */
@@ -746,6 +850,14 @@ document.addEventListener("click", ev => {
     case "remove-project": return removeProject(p);
     case "rm-root": return removeRoot(el.dataset.path);
     case "ed-save": return saveEditor();
+    case "browse": return browseFor(el.dataset.target);
+    case "pick-go": return pickerGo(el.dataset.path);
+    case "pick-cancel": return closePicker();
+    case "pick-use": {
+      const { target, listing } = picker;
+      closePicker();
+      return usePickedFolder(target, listing.path);
+    }
     case "ed-add-task":
       readProjectFields();
       sheet.draft.tasks.push({ id: "", argv: [] });
@@ -789,11 +901,16 @@ document.addEventListener("submit", ev => {
     ev.preventDefault();
     addRoot(ev.target);
   }
+  if (ev.target.dataset.form === "pick-path") {
+    ev.preventDefault();
+    pickerGo($("picker-path").value.trim());
+  }
 });
 
 document.addEventListener("keydown", ev => {
   if (ev.key !== "Escape") return;
-  if (sheet) closeSheet();
+  if (picker) closePicker();
+  else if (sheet) closeSheet();
   else if (log) closeLog();
 });
 

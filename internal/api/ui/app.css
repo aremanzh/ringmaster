@@ -285,6 +285,30 @@ select.input { appearance: auto; }
 .inline-form .input { flex: 1; }
 .quiet { font-size: 14px; color: var(--muted); }
 
+/* ---------- folder picker ---------- */
+
+.with-browse { display: flex; gap: 8px; }
+.with-browse .input { flex: 1; min-width: 0; }
+.backdrop.over { z-index: 40; }
+.picker {
+  position: fixed; z-index: 41; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(600px, calc(100vw - 24px)); height: min(640px, calc(100vh - 24px));
+  background: var(--bg); color: var(--fg); border-radius: 24px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column; overflow: hidden; animation: fade .18s ease-out both;
+}
+.picker-bar { display: flex; flex-direction: column; gap: 10px; padding: 0 24px 12px; }
+.picker-places { display: flex; flex-wrap: wrap; gap: 8px; }
+.picker-list { list-style: none; margin: 0; padding: 0 24px 12px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.picker-list button {
+  width: 100%; min-height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 14px;
+  border: none; border-radius: 12px; background: var(--surface); color: var(--fg);
+  font-family: var(--mono); font-size: 13px; text-align: left;
+}
+.picker-list button:hover { background: var(--line); }
+.picker-list button.hidden-dir { color: var(--muted); }
+.picker-list .folder { flex: none; width: 18px; height: 14px; border-radius: 3px; border: 2px solid currentColor; opacity: .7; }
+.picker-list .name { min-width: 0; overflow-wrap: anywhere; }
+
 /* ---------- toast ---------- */
 
 .toast {
@@ -322,6 +346,7 @@ select.input { appearance: auto; }
   .card-foot .spacer { display: none; }
   .sheet { inset: 0; width: auto; border-radius: 0; }
   .sheet-head .hint { display: none; }
+  .picker { inset: 0; top: 0; left: 0; transform: none; width: auto; height: auto; border-radius: 0; }
   .taskrow .kv { flex-wrap: wrap; }
   .taskrow .kv .input { flex: 1 1 100%; }
   .taskrow .kv .btn { margin-left: auto; }

@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"os"
 	"sync"
 
 	"github.com/aremanzh/ringmaster/internal/core"
@@ -81,6 +82,16 @@ func (a *App) DeleteProject(id string) error { return a.eng.DeleteProject(id) }
 func (a *App) AddPHPRoot(path string) error { return a.eng.AddPHPRoot(path) }
 
 func (a *App) DeletePHPRoot(path string) error { return a.eng.DeletePHPRoot(path) }
+
+// PickFolder opens the system's folder dialog and returns the chosen path,
+// or "" when the user cancels. start is where the dialog opens, if it exists.
+func (a *App) PickFolder(start string) (string, error) {
+	opts := wruntime.OpenDialogOptions{Title: "Pick a folder"}
+	if fi, err := os.Stat(start); err == nil && fi.IsDir() {
+		opts.DefaultDirectory = start
+	}
+	return wruntime.OpenDirectoryDialog(a.ctx, opts)
+}
 
 // PHP returns the same {roots, installs} shape as GET /api/php.
 func (a *App) PHP() (map[string]any, error) {

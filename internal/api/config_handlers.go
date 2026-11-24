@@ -113,3 +113,13 @@ func (s *Server) handlePHP(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"roots": roots, "installs": installs})
 }
+
+// handleListDir lists the subfolders of ?path= for the UI's folder picker.
+func (s *Server) handleListDir(w http.ResponseWriter, r *http.Request) {
+	listing, err := core.ListDir(r.URL.Query().Get("path"))
+	if err != nil {
+		writeErr(w, statusFor(err), err)
+		return
+	}
+	writeJSON(w, http.StatusOK, listing)
+}

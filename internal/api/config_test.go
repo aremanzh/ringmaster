@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -234,4 +235,43 @@ func TestAddAndRemovePHPRoot(t *testing.T) {
 	}
 
 	_ = os.Remove(cfgPath)
+}
+
+// TestFolderPicker: the picker endpoint lists subfolders and refuses a path
+// that is not a folder.
+func TestFolderPicker(t *testing.T) {
+	srv, _ := configTestServer(t)
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, "shop"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	res, err := http.Get(srv.URL + "/api/fs?path=" + url.QueryEscape(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	var got struct {
+		Path string `json:"path"`
+		Dirs []struct {
+			Name string `json:"name"`
+			Path string `json:"path"`
+		} `json:"dirs"`
+		Markers []string `json:"markers"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != 200 || got.Path != root || len(got.Dirs) != 1 || got.Dirs[0].Name != "shop" || got.Markers == nil {
+		t.Fatalf("status %d, listing %+v", res.StatusCode, got)
+	}
+
+	bad, err := http.Get(srv.URL + "/api/fs?path=" + url.QueryEscape(filepath.Join(root, "missing")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bad.Body.Close()
+	if bad.StatusCode != 400 {
+		t.Fatalf("missing folder: status %d, want 400", bad.StatusCode)
+	}
 }
