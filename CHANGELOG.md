@@ -2,7 +2,7 @@
 
 Notable, user-facing changes. Newest first.
 
-## Unreleased
+## 0.3.0 — 2026-11-24
 
 - **New look and layout, built around the logo.** The home screen is now a
   board of project cards in Ringmaster's own colours and typeface, in light
