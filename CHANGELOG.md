@@ -21,6 +21,24 @@ Notable, user-facing changes. Newest first.
   folder have a "Browse" button: the Windows folder dialog in the desktop app,
   and a folder list in the browser that also works from a phone. Picking a
   folder for a new project suggests its id.
+- **Forms point at the problem.** A field that is missing or wrong turns red
+  and says what it wants, under the field, once you leave it or try to save.
+  Errors from saving appear in the form, not in a message that disappears.
+- **Unsaved changes are safe.** Closing a form you changed (Esc, Close or
+  Cancel) asks before throwing the changes away.
+- **Error messages stay until you dismiss them.** Confirmations such as
+  "Saved" still leave after a few seconds.
+- **Works with the keyboard and with a screen reader.** Settings, Add project
+  and the folder list are real dialogs: focus goes in when they open and back
+  where it was when they close, and Esc closes them. Every button has its own
+  name ("Stop serve in Blog", not seven buttons called "Stop"), and a task that
+  fails is announced.
+- **Follows your text size.** Larger text set in the browser makes the whole
+  page larger without cutting anything off. On Android and ChromeOS the page
+  also opts in to the system text size (Chrome 146 and later).
+- The theme switch now flips what you see and goes back to following the system
+  when you switch back, and it stays in step between tabs. Windows contrast
+  themes and "reduce motion" are respected.
 - The PHP screen shows which project uses which PHP version.
 - `GET /api/status` reports each project's `port` and `url`, and for a task its
   `run` count and, when it failed, `exit_code` and `last_output`.

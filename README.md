@@ -111,6 +111,7 @@ While `ringmaster serve` runs (found through `ringmaster.daemon.json`), `ps`, `u
 - "Settings" on a card opens the project's configuration; "PHP" lists the PHP versions found and which project uses which.
 - Folder fields have a "Browse" button. The desktop app opens the Windows folder dialog. In a browser, which cannot give a page a real folder path, Ringmaster lists the folders itself, so it also works from a phone. Picking a folder for a new project fills in its id from the folder name.
 - It follows the system's light or dark setting, with a switch in the header, and it has a phone layout for checking on things over the LAN.
+- It can be used with the keyboard alone and with a screen reader, follows the text size you set in the browser or the system, and respects Windows contrast themes and "reduce motion".
 
 You can also manage the registry from the UI: add a project (folder, PHP version, and a Laravel or custom-command template), remove one (its tasks are stopped first and the folder is never deleted), and add or remove `php_roots` with a live list of the PHP installs found. Ringmaster validates each change, writes `ringmaster.yaml` atomically (temp file + rename) and applies it without a restart. The file is regenerated on save, so hand-written comments in `ringmaster.yaml` are lost.
 

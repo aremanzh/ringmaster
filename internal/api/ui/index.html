@@ -4,25 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
+<script>
+// A theme chosen with the toggle is applied before the first paint. With no
+// stored choice the page follows the system setting.
+try { document.querySelector('meta[name="color-scheme"]').content = localStorage.getItem("color-scheme") ?? "light dark"; } catch (e) {}
+</script>
+<meta name="text-scale" content="scale">
 <title>Ringmaster</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="icon" href="favicon.png" sizes="32x32" type="image/png">
+<link rel="preload" href="fonts/space-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="app.css">
-<script>
-// Apply a saved theme before the first paint. Without one the page follows
-// the system setting.
-try {
-  var saved = localStorage.getItem("ringmaster-theme");
-  if (saved === "light" || saved === "dark") document.documentElement.dataset.theme = saved;
-} catch (e) { /* storage unavailable: follow the system */ }
-</script>
 </head>
 <body>
-<div class="app">
+<div class="app" id="app">
 
-  <header class="top">
+  <header class="top" id="top">
     <div class="brand">
-      <svg class="mark" viewBox="0 0 64 64" width="44" height="44" role="img" aria-label="Ringmaster">
+      <svg class="mark" viewBox="0 0 64 64" width="44" height="44" role="img" aria-label="Ringmaster logo">
         <circle class="mark-ring" cx="32" cy="32" r="20" fill="none" stroke-width="6"/>
         <circle class="mark-top" cx="32" cy="12" r="7"/>
         <circle class="mark-node" cx="14.68" cy="42" r="7"/>
@@ -30,7 +29,7 @@ try {
       </svg>
       <div class="brand-text">
         <h1>Ringmaster</h1>
-        <p id="summary" class="summary" role="status" aria-live="polite"></p>
+        <p id="summary" class="summary"></p>
       </div>
     </div>
     <div class="top-actions">
@@ -38,30 +37,55 @@ try {
       <button type="button" class="btn tile" data-act="start-all">Start all</button>
       <button type="button" class="btn tile" data-act="stop-all">Stop all</button>
       <button type="button" class="btn strong wide-only" data-act="add">+ Add project</button>
-      <button type="button" class="btn tile icon" data-act="theme" aria-label="Switch between light and dark">
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>
+      <!-- Both states are in the markup; CSS shows the one that applies, so the
+           button is right even when the system setting changes. -->
+      <button type="button" class="btn tile icon" data-act="theme">
+        <span class="to-dark">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>
+          <span class="visually-hidden">Switch to dark theme</span>
+        </span>
+        <span class="to-light">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/></svg>
+          <span class="visually-hidden">Switch to light theme</span>
+        </span>
       </button>
-      <span id="conn" class="conn" role="status" title="connecting"></span>
+      <span class="conn" id="conn">
+        <span class="dot" aria-hidden="true"></span>
+        <span class="visually-hidden" id="conn-text">Connecting</span>
+      </span>
     </div>
   </header>
 
   <main class="layout" id="layout">
     <section class="board" id="board" aria-label="Projects"></section>
-    <aside class="logpanel" id="logpanel" aria-label="Log" hidden></aside>
+    <aside class="logpanel" id="logpanel" aria-labelledby="log-title" hidden></aside>
   </main>
 
-  <nav class="bottomnav" aria-label="Sections">
-    <button type="button" data-act="home" id="nav-home" aria-current="page">Projects</button>
-    <button type="button" data-act="php" id="nav-php">PHP</button>
-    <button type="button" data-act="add" id="nav-add">+ Add</button>
+  <nav class="bottomnav" id="bottomnav" aria-label="Sections">
+    <button type="button" data-act="home" aria-current="page">Projects</button>
+    <button type="button" data-act="php">PHP</button>
+    <button type="button" data-act="add">+ Add</button>
   </nav>
 </div>
 
-<div class="backdrop" id="backdrop" data-act="close-sheet" hidden></div>
-<aside class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" hidden></aside>
-<div class="backdrop over" id="picker-backdrop" data-act="pick-cancel" hidden></div>
-<div class="picker" id="picker" role="dialog" aria-modal="true" aria-labelledby="picker-title" hidden></div>
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<!-- Each dialog keeps its own live region: while a modal dialog is open the
+     rest of the page is inert, so an announcement made out there is lost. -->
+<dialog class="sheet" id="sheet" aria-labelledby="sheet-title">
+  <div class="frame" id="sheet-frame"></div>
+  <div class="visually-hidden" id="sheet-live" aria-live="polite"></div>
+</dialog>
+
+<dialog class="picker" id="picker" aria-labelledby="picker-title" closedby="any">
+  <div class="frame" id="picker-frame"></div>
+  <div class="visually-hidden" id="picker-live" aria-live="polite"></div>
+</dialog>
+
+<div class="toasts" id="toasts" role="region" aria-label="Notifications" popover="manual"></div>
+
+<div class="visually-hidden">
+  <p id="page-live-label" hidden>Screen reader announcements</p>
+  <div id="page-live" aria-live="polite"></div>
+</div>
 
 <script src="backend.js"></script>
 <script src="app.js"></script>
