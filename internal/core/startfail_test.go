@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aremanzh/ringmaster/internal/config"
 	"github.com/aremanzh/ringmaster/internal/supervisor"
@@ -83,4 +84,54 @@ func taskView(t *testing.T, eng *Engine, task string) TaskView {
 	}
 	t.Fatalf("task %s not in status", task)
 	return TaskView{}
+}
+
+// TestStatusCarriesURLAndFailureDetails: the status view has what the UI
+// needs to link to a project and to explain a failed task.
+func TestStatusCarriesURLAndFailureDetails(t *testing.T) {
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	// The test binary asked to run a test that does not exist prints a
+	// warning and exits 0; with an unknown flag it prints usage and exits 2.
+	failing := []string{exe, "-ringmaster-no-such-flag"}
+	cfg := &config.Config{Version: 1, Projects: []config.Project{
+		{ID: "shop", Path: dir, Tasks: []config.Task{{ID: "serve", Argv: failing, Primary: true}, {ID: "vite", Argv: failing}}},
+		{ID: "worker", Path: dir, Tasks: []config.Task{{ID: "run", Argv: failing}}},
+	}}
+	specs := map[string]supervisor.TaskSpec{
+		"shop:serve": {Key: "shop:serve", Dir: dir, Argv: failing, Host: "0.0.0.0", Port: 18777, Primary: true},
+		"shop:vite":  {Key: "shop:vite", Dir: dir, Argv: failing},
+		"worker:run": {Key: "worker:run", Dir: dir, Argv: failing},
+	}
+	sup := supervisor.New(filepath.Join(dir, "state.json"))
+	eng := New(sup, cfg, specs, Callbacks{})
+
+	views := eng.Status()
+	if views[0].Port != 18777 || views[0].URL != "http://127.0.0.1:18777" {
+		t.Errorf("shop: port %d url %q, want 18777 and a loopback URL for the wildcard bind", views[0].Port, views[0].URL)
+	}
+	if views[1].Port != 0 || views[1].URL != "" {
+		t.Errorf("worker has no primary task but got port %d url %q", views[1].Port, views[1].URL)
+	}
+
+	if err := eng.TaskAction("worker", "run", "start"); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	var run TaskView
+	for i := 0; i < 200; i++ {
+		run = eng.Status()[1].Tasks[0]
+		if run.Status == supervisor.StatusFailed {
+			break
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	if run.Status != supervisor.StatusFailed || run.ExitCode == nil || *run.ExitCode == 0 || run.LastOutput == "" {
+		t.Fatalf("failed task view = %+v, want failed with an exit code and a last output line", run)
+	}
+	if run.Run != 0 {
+		t.Errorf("run = %d, want it omitted for a first run", run.Run)
+	}
 }

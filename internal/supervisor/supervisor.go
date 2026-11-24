@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/aremanzh/ringmaster/internal/config"
@@ -97,6 +98,13 @@ type TaskInfo struct {
 	PID       int
 	Port      int
 	StartedAt time.Time
+	// Run counts how many times the task has been started since the user
+	// last started it: 1, then one more for every restart by its policy.
+	Run int
+	// ExitCode and LastOutput explain a failed task: how its process ended
+	// and the last line it printed. Both are unset unless Status is failed.
+	ExitCode   *int
+	LastOutput string
 }
 
 // ReapResult describes what happened to one recorded state entry during
@@ -125,6 +133,17 @@ type task struct {
 	startedAt     time.Time
 	stopRequested bool
 	stopCh        chan struct{} // closed by Stop; cuts a pending restart delay short
+	// run is this generation's number: 1 for a start the user asked for, one
+	// more for each restart by policy (see TaskInfo.Run).
+	run int
+	// exited and exitCode record how this generation's process ended.
+	hasExited bool
+	exitCode  int
+	// lastOut and lastErr are the last non-blank line the process printed on
+	// each stream, with when it arrived. Written by the output readers, read
+	// by lastOutput.
+	lastOut atomic.Pointer[stampedLine]
+	lastErr atomic.Pointer[stampedLine]
 	// failures counts failed runs in a row and restarts counts restarts in a
 	// row; a stable run resets both. They carry over from one process
 	// generation to the next (respawn).
@@ -136,10 +155,36 @@ type task struct {
 	exited    chan struct{}  // closed when the monitor goroutine finishes
 }
 
+// stampedLine is one output line and when it was read.
+type stampedLine struct {
+	line string
+	at   time.Time
+}
+
+// lastOutput is the best one-line explanation of how the process ended: the
+// last line it printed. The two streams are read by separate goroutines, so
+// lines written in the same instant can arrive in either order; within
+// streamTie of each other the stderr line wins, as the likelier error message.
+func (t *task) lastOutput() string {
+	const streamTie = 100 * time.Millisecond
+	out, errLine := t.lastOut.Load(), t.lastErr.Load()
+	switch {
+	case out == nil && errLine == nil:
+		return ""
+	case out == nil:
+		return errLine.line
+	case errLine == nil:
+		return out.line
+	case out.at.Sub(errLine.at) > streamTie:
+		return out.line
+	}
+	return errLine.line
+}
+
 // newTask builds the bookkeeping for one process generation.
 func newTask(spec TaskSpec, r *ring) *task {
 	return &task{
-		spec: spec, ring: r,
+		spec: spec, ring: r, run: 1,
 		stopCh:  make(chan struct{}),
 		matched: make(chan struct{}), matchOnce: &sync.Once{},
 		exited: make(chan struct{}),
@@ -341,6 +386,14 @@ func (t *task) pump(stream string, r io.ReadCloser) {
 	for sc.Scan() {
 		line := decodeConsole(sc.Bytes())
 		t.ring.Append(stream, line)
+		if strings.TrimSpace(line) != "" {
+			last := &stampedLine{line: line, at: time.Now()}
+			if stream == "err" {
+				t.lastErr.Store(last)
+			} else {
+				t.lastOut.Store(last)
+			}
+		}
 		if stream == "out" && t.spec.Ready != nil && t.spec.Ready.Type == "stdout" &&
 			strings.Contains(line, t.spec.Ready.Match) {
 			t.matchOnce.Do(func() { close(t.matched) })
@@ -442,6 +495,7 @@ func (s *Supervisor) monitor(t *task) {
 	if t.cmd.ProcessState != nil {
 		exitCode = t.cmd.ProcessState.ExitCode()
 	}
+	t.hasExited, t.exitCode = true, exitCode
 	if t.stopRequested {
 		t.status = StatusStopped
 		s.mu.Unlock()
@@ -505,6 +559,7 @@ func (s *Supervisor) respawn(t *task) {
 	// counters carry over.
 	nt := newTask(t.spec, t.ring)
 	nt.failures, nt.restarts = t.failures, t.restarts
+	nt.run = t.run + 1
 	if err := s.spawn(nt); err != nil {
 		s.mu.Lock()
 		t.status = StatusFailed
@@ -584,7 +639,14 @@ func (s *Supervisor) List() []TaskInfo {
 	defer s.mu.Unlock()
 	out := make([]TaskInfo, 0, len(s.tasks))
 	for _, t := range s.tasks {
-		info := TaskInfo{Key: t.spec.Key, Status: t.status, Port: t.spec.Port, StartedAt: t.startedAt}
+		info := TaskInfo{Key: t.spec.Key, Status: t.status, Port: t.spec.Port, StartedAt: t.startedAt, Run: t.run}
+		if t.status == StatusFailed {
+			if t.hasExited {
+				code := t.exitCode
+				info.ExitCode = &code
+			}
+			info.LastOutput = t.lastOutput()
+		}
 		if t.group != nil && (t.status == StatusStarting || t.status == StatusRunning || t.status == StatusStopping) {
 			// A task waiting out a restart delay is "starting" with its old
 			// process already gone: report no PID rather than a dead one.

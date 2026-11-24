@@ -140,6 +140,14 @@ type TaskView struct {
 	// External marks an observed-only service; status comes from a port probe,
 	// and start/stop/restart are rejected.
 	External bool `json:"external,omitempty"`
+	// Run is how many times the task has been started since the user last
+	// started it; set only from the second run on, i.e. after a restart by
+	// its policy.
+	Run int `json:"run,omitempty"`
+	// ExitCode and LastOutput explain a failed task: the exit code of its
+	// process and the last line it printed.
+	ExitCode   *int   `json:"exit_code,omitempty"`
+	LastOutput string `json:"last_output,omitempty"`
 	// StartError is why the last start attempt failed (e.g. "port 8101 on
 	// 127.0.0.1 is in use by PID 1234 (php.exe)"). Empty while the task is
 	// starting or running; cleared by the next successful start.
@@ -152,6 +160,10 @@ type ProjectView struct {
 	Label string `json:"label"`
 	Path  string `json:"path"`
 	PHP   string `json:"php,omitempty"`
+	// Port and URL are where the project's primary task listens, for an
+	// "open in browser" link. Unset for a project without a primary task.
+	Port int    `json:"port,omitempty"`
+	URL  string `json:"url,omitempty"`
 	// Error is set when the project's tasks could not be built (e.g. its path
 	// does not exist); none of its tasks can be started until it is fixed.
 	Error string     `json:"error,omitempty"`

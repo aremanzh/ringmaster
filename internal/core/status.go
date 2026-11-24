@@ -45,10 +45,19 @@ func (e *Engine) Status() []ProjectView {
 			if spec, ok := e.specs[key]; ok {
 				tv.Argv = spec.Argv
 				tv.Port = spec.Port
+				if t.Primary && spec.Port != 0 {
+					pv.Port = spec.Port
+					pv.URL = "http://" + net.JoinHostPort(dialHost(spec.Host), fmt.Sprintf("%d", spec.Port))
+				}
 			}
 			if info, ok := live[key]; ok {
 				tv.Status = info.Status
 				tv.PID = info.PID
+				if info.Run > 1 {
+					tv.Run = info.Run
+				}
+				tv.ExitCode = info.ExitCode
+				tv.LastOutput = info.LastOutput
 				if !info.StartedAt.IsZero() {
 					ts := info.StartedAt
 					tv.StartedAt = &ts
@@ -70,13 +79,19 @@ func probeExternal(host string, port int) bool {
 	if port == 0 {
 		return false
 	}
-	if host == "" || host == "0.0.0.0" || host == "::" {
-		host = "127.0.0.1"
-	}
-	conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, fmt.Sprintf("%d", port)), 300*time.Millisecond)
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(dialHost(host), fmt.Sprintf("%d", port)), 300*time.Millisecond)
 	if err != nil {
 		return false
 	}
 	conn.Close()
 	return true
+}
+
+// dialHost turns a bind host into one a client can connect to: a wildcard
+// or empty address becomes loopback.
+func dialHost(host string) string {
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		return "127.0.0.1"
+	}
+	return host
 }

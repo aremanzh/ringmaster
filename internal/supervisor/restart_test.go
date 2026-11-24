@@ -167,3 +167,85 @@ func TestStopInterruptsRestartDelay(t *testing.T) {
 	}
 	waitStatus(t, s, "p:slow", StatusStopped, 2*time.Second)
 }
+
+// TestFailedTaskExplainsItself: a failed task reports how its process ended
+// and the last line it printed, and counts its runs.
+func TestFailedTaskExplainsItself(t *testing.T) {
+	setRestartTiming(t, 5*time.Millisecond, 20*time.Millisecond, time.Hour)
+	s := newTestSupervisor(t)
+	find := func(key string) TaskInfo {
+		t.Helper()
+		for _, info := range s.List() {
+			if info.Key == key {
+				return info
+			}
+		}
+		t.Fatalf("task %s not listed", key)
+		return TaskInfo{}
+	}
+
+	if err := s.Start(TaskSpec{Key: "p:bad", Argv: helperArgv(t, 0, 3)}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	waitStatus(t, s, "p:bad", StatusFailed, 20*time.Second)
+	info := find("p:bad")
+	if info.ExitCode == nil || *info.ExitCode != 3 {
+		t.Errorf("ExitCode = %v, want 3", info.ExitCode)
+	}
+	if info.LastOutput != "helper last line" {
+		t.Errorf("LastOutput = %q, want the last line the process printed", info.LastOutput)
+	}
+	if info.Run != 1 {
+		t.Errorf("Run = %d, want 1", info.Run)
+	}
+
+	// A crash loop that gave up: started once plus five restarts.
+	if err := s.Start(TaskSpec{Key: "p:loop", Argv: helperArgv(t, 0, 2), Restart: RestartOnFailure}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	waitStatus(t, s, "p:loop", StatusFailed, 20*time.Second)
+	if info := find("p:loop"); info.Run != maxConsecutiveFailures+1 || info.ExitCode == nil || *info.ExitCode != 2 {
+		t.Errorf("crash loop: Run = %d, ExitCode = %v, want run %d and exit code 2", info.Run, info.ExitCode, maxConsecutiveFailures+1)
+	}
+
+	// A healthy or cleanly stopped task carries no failure details.
+	if err := s.Start(TaskSpec{Key: "p:ok", Argv: helperArgv(t, 0, 0)}); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	waitStatus(t, s, "p:ok", StatusStopped, 20*time.Second)
+	if info := find("p:ok"); info.ExitCode != nil || info.LastOutput != "" {
+		t.Errorf("stopped task carries failure details: %+v", info)
+	}
+}
+
+func TestLastOutputPicksTheLaterLine(t *testing.T) {
+	now := time.Now()
+	set := func(out, errLine string, outAfterErr time.Duration) *task {
+		task := newTask(TaskSpec{}, newRing())
+		if errLine != "" {
+			task.lastErr.Store(&stampedLine{line: errLine, at: now})
+		}
+		if out != "" {
+			task.lastOut.Store(&stampedLine{line: out, at: now.Add(outAfterErr)})
+		}
+		return task
+	}
+	tests := []struct {
+		name        string
+		out, errOut string
+		outAfterErr time.Duration
+		want        string
+	}{
+		{"nothing printed", "", "", 0, ""},
+		{"stdout only (PHP prints its errors there)", "Could not open input file: artisan", "", 0, "Could not open input file: artisan"},
+		{"stderr only", "", "panic: boom", 0, "panic: boom"},
+		{"written together: stderr wins", "listening", "fatal: port in use", 5 * time.Millisecond, "fatal: port in use"},
+		{"stdout clearly later than an old warning", "Fatal error: syntax error", "Deprecated: something", 3 * time.Second, "Fatal error: syntax error"},
+		{"stderr later", "ready", "crashed", -3 * time.Second, "crashed"},
+	}
+	for _, tt := range tests {
+		if got := set(tt.out, tt.errOut, tt.outAfterErr).lastOutput(); got != tt.want {
+			t.Errorf("%s: got %q, want %q", tt.name, got, tt.want)
+		}
+	}
+}
